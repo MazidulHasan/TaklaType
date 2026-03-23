@@ -1,0 +1,440 @@
+You are a senior full-stack software engineer and UI/UX developer.
+
+Your task is to build a complete working web application.
+
+Project Name:
+TaklaType
+Goal:
+Build a typing race web application similar to Monkeytype (simplified version).
+
+Users will type Banglish sentences (Bangla pronunciation written using English letters).
+
+Example Sentence:
+"ami ajke office e late esechi"
+
+All sentences will be loaded from a local .txt file.
+
+This Phase-1 version MUST NOT include Firebase.
+All logic must work locally first.
+
+====================================================
+CORE PROJECT OBJECTIVE
+====================================================
+
+Create a fully working typing race web app that includes:
+
+1. Random Banglish sentence loading
+2. Typing interface
+3. Character-by-character validation
+4. Live typing feedback
+5. Timer system
+6. WPM calculation
+7. Accuracy calculation
+8. Error counting
+9. Restart functionality
+10. Progress bar visualization
+11. Result display panel
+
+All functionality must work locally.
+
+====================================================
+TECHNOLOGY STACK
+====================================================
+
+Backend:
+- Python
+- FastAPI
+
+Frontend:
+- HTML5
+- CSS3
+- Vanilla JavaScript
+
+No frameworks like React or Vue.
+
+UI must be clean and responsive.
+
+====================================================
+PROJECT STRUCTURE
+====================================================
+
+Generate the project using this exact folder structure:
+
+type-racer/
+
+backend/
+    main.py
+    sentence_loader.py
+    typing_utils.py
+
+frontend/
+    index.html
+    style.css
+    script.js
+
+data/
+    sentences.txt
+
+requirements.txt
+
+README.md
+
+====================================================
+BACKEND REQUIREMENTS
+====================================================
+
+Use FastAPI.
+
+Create the following APIs:
+
+-----------------------------------
+
+GET /get-sentence
+
+Purpose:
+Return a random sentence from sentences.txt
+
+Response Format:
+
+{
+  "sentence": "ami ajke office e late esechi"
+}
+
+-----------------------------------
+
+GET /health
+
+Purpose:
+Health check endpoint.
+
+Response:
+
+{
+  "status": "running"
+}
+
+-----------------------------------
+
+Sentence Loading Rules:
+
+- Read from:
+  data/sentences.txt
+
+- Each line = one sentence
+
+- Ignore empty lines
+
+- Randomly return one sentence
+
+- Load sentences once at startup
+  (not every request)
+
+-----------------------------------
+
+Error Handling:
+
+If file missing:
+
+Return:
+
+{
+  "error": "Sentence file not found"
+}
+
+====================================================
+TYPING ENGINE LOGIC
+====================================================
+
+Typing logic will be implemented in frontend JavaScript.
+
+Required behaviors:
+
+1. Timer starts on first keypress
+
+2. Character matching:
+
+Correct characters → green  
+Incorrect characters → red  
+
+3. Cursor position tracked
+
+4. Backspace supported
+
+5. Progress bar updates live
+
+6. Sentence completion detection
+
+7. Timer stops automatically
+
+====================================================
+METRICS CALCULATION
+====================================================
+
+Calculate the following:
+
+-----------------------------------
+
+WPM Formula:
+
+WPM = (characters_typed / 5) / minutes
+
+-----------------------------------
+
+Accuracy Formula:
+
+Accuracy = (correct_characters / total_characters) * 100
+
+-----------------------------------
+
+Errors:
+
+Count incorrect characters typed.
+
+-----------------------------------
+
+Time:
+
+Total typing duration.
+
+====================================================
+FRONTEND UI REQUIREMENTS
+====================================================
+
+UI must be modern and clean.
+
+Use a dark theme.
+
+Required Components:
+
+-----------------------------------
+
+1. Sentence Display Area
+
+- Shows sentence
+- Character highlighting
+
+-----------------------------------
+
+2. Typing Input Box
+
+- Text input field
+- Focus automatically on load
+
+-----------------------------------
+
+3. Timer Display
+
+Format:
+
+00:00
+
+-----------------------------------
+
+4. WPM Display
+
+Show:
+
+WPM: 0
+
+-----------------------------------
+
+5. Accuracy Display
+
+Show:
+
+Accuracy: 100%
+
+-----------------------------------
+
+6. Error Display
+
+Show:
+
+Errors: 0
+
+-----------------------------------
+
+7. Progress Bar
+
+Shows typing completion percentage.
+
+-----------------------------------
+
+8. Restart Button
+
+Reset everything:
+
+- Timer
+- Input
+- Stats
+- Progress
+
+Load new sentence.
+
+====================================================
+CHARACTER HIGHLIGHTING RULES
+====================================================
+
+Each character must be visually styled.
+
+Correct → green  
+Incorrect → red  
+Remaining → gray  
+
+Cursor position → underline.
+
+====================================================
+KEYBOARD BEHAVIOR
+====================================================
+
+Must support:
+
+- Normal typing
+- Backspace
+- Enter disabled
+- No paste allowed
+- Ignore arrow keys
+
+====================================================
+STYLING REQUIREMENTS
+====================================================
+
+Use:
+
+- CSS Flexbox
+- Responsive layout
+
+Font:
+
+Use monospace font.
+
+Colors:
+
+Background → dark  
+Text → light  
+Correct → green  
+Wrong → red  
+
+Progress bar → animated.
+
+====================================================
+DATA FILE REQUIREMENTS
+====================================================
+
+Use file:
+
+data/sentences.txt
+
+Each line:
+
+One Banglish sentence.
+
+Example:
+
+ami ajke office e late esechi
+boss ajke khub serious mood e
+release date ajke push hoye gelo
+
+====================================================
+RESTART SYSTEM
+====================================================
+
+Restart must:
+
+- Reset timer
+- Reset stats
+- Reset progress
+- Clear input
+- Load new sentence
+
+====================================================
+PERFORMANCE REQUIREMENTS
+====================================================
+
+Typing must feel smooth.
+
+No lag.
+
+Sentence load < 100ms.
+
+====================================================
+README REQUIREMENTS
+====================================================
+
+Generate README.md containing:
+
+1. Project description
+2. Setup instructions
+3. Run backend steps
+4. Run frontend steps
+5. Install dependencies
+6. Troubleshooting
+
+====================================================
+REQUIREMENTS.TXT
+====================================================
+
+Include:
+
+fastapi
+uvicorn
+
+====================================================
+RUN INSTRUCTIONS
+====================================================
+
+Backend:
+
+uvicorn backend.main:app --reload
+
+Frontend:
+
+Open:
+
+frontend/index.html
+
+====================================================
+CODE QUALITY RULES
+====================================================
+
+All code must:
+
+- Be modular
+- Have comments
+- Use clear naming
+- Avoid duplicate logic
+- Follow best practices
+
+====================================================
+OUTPUT REQUIREMENTS
+====================================================
+
+Generate:
+
+1. Full backend code
+2. Full frontend code
+3. CSS styling
+4. JavaScript typing logic
+5. sentences.txt example
+6. requirements.txt
+7. README.md
+
+All files must be complete and runnable.
+
+Do NOT output partial code.
+
+Generate everything needed to run the project locally.
+
+====================================================
+OPTIONAL NICE FEATURES (Include If Possible)
+====================================================
+
+- Sound on error
+- Smooth progress animation
+- Blinking cursor
+- Subtle animations
+- Session summary popup
+
+====================================================
+END OF INSTRUCTIONS
+====================================================

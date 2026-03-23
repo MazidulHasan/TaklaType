@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Bash(pip install:*)",
+      "Bash(python -m pip install playwright)",
+      "Bash(python -m playwright install chromium)",
+      "Bash(python:*)",
+      "Bash(curl -s http://127.0.0.1:8000/health)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 8000 -State Listen | Select-Object -ExpandProperty OwningProcess\" 2>/dev/null)",
+      "Bash(powershell -Command \"netstat -ano | findstr ':8000'\" 2>/dev/null)"
+    ]
+  }
+}

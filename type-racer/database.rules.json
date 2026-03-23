@@ -1,0 +1,22 @@
+{
+  "rules": {
+    ".read":  false,
+    ".write": false,
+
+    "rooms": {
+      "$roomCode": {
+        // Any authenticated user can read a room (to join or spectate)
+        ".read": "auth != null",
+
+        // Only the backend (Admin SDK) creates rooms — but players write their own progress
+        "players": {
+          "$uid": {
+            // Each player can write only to their own slot
+            ".read":  "auth != null",
+            ".write": "auth != null && auth.uid == $uid"
+          }
+        }
+      }
+    }
+  }
+}

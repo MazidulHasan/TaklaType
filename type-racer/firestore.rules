@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Users ─────────────────────────────────────────────────────────────────
+    // Only the owner can read/write their own user doc
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ── Stats ─────────────────────────────────────────────────────────────────
+    // Backend (Admin SDK) writes. Authenticated users can read their own stats.
+    match /stats/{docId} {
+      allow read:  if request.auth != null && resource.data.uid == request.auth.uid;
+      allow write: if false; // Only Admin SDK writes
+    }
+
+    // ── Leaderboard ───────────────────────────────────────────────────────────
+    // Anyone (including unauthenticated) can read the leaderboard.
+    // Only Admin SDK writes (via save-result endpoint).
+    match /leaderboard/{uid} {
+      allow read:  if true;
+      allow write: if false; // Only Admin SDK writes
+    }
+  }
+}
