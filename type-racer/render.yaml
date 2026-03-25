@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: taklatype
+    runtime: python
+    rootDir: type-racer
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: FIREBASE_DATABASE_URL
+        value: https://taklatype-default-rtdb.firebaseio.com
+      - key: FIREBASE_CREDENTIALS_PATH
+        value: /etc/secrets/firebase-service-account.json
