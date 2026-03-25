@@ -295,43 +295,47 @@ body {
   50%      { opacity: 0; }
 }
 
-/* ── Dot base — replaces the conn-dot circle with a styled text character ── */
-.logo-dot {
-  display:       inline-block;
-  width:         auto;
-  height:        auto;
-  border-radius: 0;
-  background:    transparent !important;
-  box-shadow:    none !important;
-  font-size:     inherit;
-  line-height:   1;
-  color:         var(--accent);
-  animation:     logo-dot-idle 3s ease-in-out infinite !important;
+/* ── User panel connection status + water ripple ── */
+.user-panel {
+  --rip: var(--accent);
+  transition: background 0.4s, border-color 0.4s;
 }
-@keyframes logo-dot-idle {
-  0%, 100% { color: var(--accent); opacity: 1; }
-  8%       { color: color-mix(in srgb, white 60%, var(--accent)); opacity: 0.6; }
-  16%      { color: var(--accent); opacity: 1; }
+.user-panel.connected {
+  --rip: var(--correct);
+  background:   color-mix(in srgb, var(--correct) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--correct) 45%, transparent);
+}
+.user-panel.disconnected {
+  --rip: var(--wrong);
+  background:   color-mix(in srgb, var(--wrong) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--wrong) 45%, transparent);
 }
 
-/* Connected: green */
-.logo-dot.connected {
-  animation: logo-dot-connected 3s ease-in-out infinite !important;
+/* Ripple — two rings expanding outward from the box edge */
+.user-panel.ripple {
+  animation: user-ripple 1.8s ease-out forwards;
 }
-@keyframes logo-dot-connected {
-  0%, 100% { color: var(--correct); opacity: 1; }
-  8%       { color: color-mix(in srgb, white 60%, var(--correct)); opacity: 0.6; }
-  16%      { color: var(--correct); opacity: 1; }
-}
-
-/* Disconnected: fast red blink */
-.logo-dot.disconnected {
-  color:     var(--wrong) !important;
-  animation: logo-dot-error 0.65s ease-in-out infinite !important;
-}
-@keyframes logo-dot-error {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.3; }
+@keyframes user-ripple {
+  0% {
+    box-shadow:
+      0 0 0  0px color-mix(in srgb, var(--rip) 42%, transparent),
+      0 0 0  0px color-mix(in srgb, var(--rip) 20%, transparent);
+  }
+  30% {
+    box-shadow:
+      0 0 0  5px color-mix(in srgb, var(--rip) 16%, transparent),
+      0 0 0  1px color-mix(in srgb, var(--rip) 36%, transparent);
+  }
+  60% {
+    box-shadow:
+      0 0 0 12px color-mix(in srgb, var(--rip)  5%, transparent),
+      0 0 0  7px color-mix(in srgb, var(--rip) 10%, transparent);
+  }
+  100% {
+    box-shadow:
+      0 0 0 20px color-mix(in srgb, var(--rip)  0%, transparent),
+      0 0 0 14px color-mix(in srgb, var(--rip)  0%, transparent);
+  }
 }
 .subtitle { font-size: 0.72rem; color: var(--muted); letter-spacing: 1px; margin-top: 0.25rem; text-transform: uppercase; }
 
@@ -853,6 +857,41 @@ body {
 
 /* ---------- Confetti ---------- */
 #confetti-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 99; }
+
+/* ---------- Solo Result Loading Overlay ---------- */
+.result-loading {
+  position:        fixed;
+  inset:           0;
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  justify-content: center;
+  gap:             1rem;
+  background:      rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+  z-index:         99;
+  opacity:         0;
+  pointer-events:  none;
+  transition:      opacity 0.25s ease;
+}
+.result-loading.show {
+  opacity:        1;
+  pointer-events: all;
+}
+.result-loading-spinner {
+  width:        36px;
+  height:       36px;
+  border:       3px solid var(--border);
+  border-top:   3px solid var(--accent);
+  border-radius: 50%;
+  animation:    rl-spin 0.75s linear infinite;
+}
+@keyframes rl-spin { to { transform: rotate(360deg); } }
+.result-loading-text {
+  color:       var(--muted);
+  font-size:   0.9rem;
+  font-family: var(--font);
+}
 
 /* ---------- Result Overlay ---------- */
 .result-overlay {
@@ -1402,10 +1441,84 @@ body {
 .mp-result-wpm  { color: var(--correct); font-weight: 700; }
 
 .mp-reset-waiting {
-  font-size:   0.8rem;
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  gap:             0.65rem;
+  padding:         1rem 0 0.5rem;
+  font-size:       0.85rem;
+  color:           var(--muted);
+  text-align:      center;
+}
+
+#mp-result-actions {
+  display:        flex;
+  flex-direction: column;
+  align-items:    center;
+  gap:            0.6rem;
+  width:          100%;
+}
+
+#mp-rematch-setup {
+  display:        flex;
+  flex-direction: column;
+  align-items:    stretch;
+  gap:            0.75rem;
+  padding-top:    0.5rem;
+  width:          100%;
+}
+#mp-rematch-setup .btn-mp-result-leave,
+#mp-reset-waiting .btn-mp-result-leave {
+  margin-top:  0.5rem;
+  align-self:  center;
+}
+.mp-rematch-label {
+  font-size:   0.75rem;
   color:       var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
   text-align:  center;
-  animation:   cd-pulse 1.4s ease infinite;
+}
+
+.mp-result-rematch-icon {
+  font-size:   0.85rem;
+  color:       var(--accent);
+  margin-left: auto;
+  display:     inline-block;
+  animation:   mp-rematch-pulse 1.4s ease-in-out infinite;
+}
+@keyframes mp-rematch-pulse {
+  0%, 100% { transform: scale(1);    opacity: 0.65; }
+  50%      { transform: scale(1.35); opacity: 1;    }
+}
+
+#mp-join-loading-view {
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  justify-content: center;
+  gap:             1.2rem;
+  padding:         3rem 1.5rem;
+  min-height:      200px;
+}
+.mp-join-loading-msg {
+  color:      var(--muted);
+  font-size:  0.9rem;
+  text-align: center;
+}
+
+.auth-room-notice {
+  display:       flex;
+  align-items:   center;
+  gap:           0.5rem;
+  background:    color-mix(in srgb, var(--accent) 12%, var(--surface2));
+  border:        1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 8px;
+  padding:       0.5rem 0.9rem;
+  font-size:     0.82rem;
+  color:         var(--text);
+  width:         100%;
+  box-sizing:    border-box;
 }
 
 .btn-mp-result-leave {
@@ -1454,30 +1567,6 @@ body {
 @keyframes toast-out { from { opacity: 1; } to { opacity: 0; transform: translateY(6px); } }
 
 /* ---------- Connection Dot ---------- */
-.conn-dot {
-  display:       inline-block;
-  width:         8px;
-  height:        8px;
-  border-radius: 50%;
-  background:    var(--muted);
-  align-self:    center;
-  position:      relative;
-  transition:    background 0.4s;
-}
-.conn-dot.connected {
-  background: var(--correct);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--correct) 50%, transparent);
-  animation: conn-ping 2s ease-out infinite;
-}
-.conn-dot.disconnected {
-  background: var(--wrong);
-  animation: cd-pulse 0.8s ease infinite;
-}
-@keyframes conn-ping {
-  0%   { box-shadow: 0 0 0 0   color-mix(in srgb, var(--correct) 55%, transparent); }
-  60%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--correct) 0%,  transparent); }
-  100% { box-shadow: 0 0 0 0   color-mix(in srgb, var(--correct) 0%,  transparent); }
-}
 
 /* ---------- Auth Modal ---------- */
 .auth-overlay {

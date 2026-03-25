@@ -222,6 +222,8 @@ typingInput.addEventListener('blur', () => {
 
 // ─── Fetch Sentence ───────────────────────────────────────────────────────────
 async function fetchSentence() {
+  btnRestart.disabled    = true;
+  btnRestart.textContent = '↺ Loading…';
   sentenceDisplay.innerHTML = '<span class="loading-text">Loading…</span>';
   sentenceContainer.classList.remove('hide-hint');
 
@@ -246,6 +248,9 @@ async function fetchSentence() {
     sentenceDisplay.innerHTML =
       '<span class="loading-text" style="color:var(--wrong)">Backend not running? Run: uvicorn backend.main:app --reload</span>';
     console.error(err);
+  } finally {
+    btnRestart.disabled    = false;
+    btnRestart.textContent = '↺ New Race';
   }
 }
 
@@ -553,6 +558,10 @@ async function finishRound() {
 
   launchConfetti();
 
+  // Show loading overlay immediately after confetti
+  const resultLoadingEl = document.getElementById('result-loading');
+  if (resultLoadingEl) resultLoadingEl.classList.add('show');
+
   // Save result to backend if user is signed in
   resultSaveStatus.textContent = '';
   const user = getCurrentUser();
@@ -573,13 +582,14 @@ async function finishRound() {
   }
 
   setTimeout(() => {
+    if (resultLoadingEl) resultLoadingEl.classList.remove('show');
     rollup(resultWpmEl,  wpm,         '',  700);
     rollup(resultAccEl,  acc,         '%', 700);
     rollup(resultErrEl,  totalErrors, '',  500);
     rollup(resultTimeEl, secs,        's', 600);
     renderHeatmap();
     showResult();
-  }, 450);
+  }, 1100);
 }
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
@@ -590,6 +600,8 @@ function showResult() {
 function hideResult() {
   resultOverlay.classList.remove('show');
   resultOverlay.setAttribute('aria-hidden', 'true');
+  const rl = document.getElementById('result-loading');
+  if (rl) rl.classList.remove('show');
 }
 
 resultOverlay.addEventListener('click', e => { if (e.target === resultOverlay) fetchSentence(); });
@@ -622,32 +634,16 @@ export function trapFocus(modalEl) {
   const el = document.getElementById('logo-text');
   if (!el) return;
   const WORD     = 'TaklaType';
-  const TYPE_MS  = 90;   // delay between each character appearing
-  const HOLD_MS  = 3500; // pause after fully typed
-  const ERASE_MS = 400;  // fade-out duration before retyping
+  const TYPE_MS = 90; // ms between each character
 
-  function typeLoop() {
-    let i = 0;
-    el.classList.remove('typed');
-    el.textContent = '';
-    const iv = setInterval(() => {
-      el.textContent = WORD.slice(0, ++i);
-      if (i === WORD.length) {
-        clearInterval(iv);
-        el.classList.add('typed'); // hide cursor after fully typed
-        setTimeout(() => {
-          el.style.transition = `opacity ${ERASE_MS}ms`;
-          el.style.opacity    = '0';
-          setTimeout(() => {
-            el.style.opacity    = '1';
-            el.style.transition = '';
-            typeLoop();
-          }, ERASE_MS + 100);
-        }, HOLD_MS);
-      }
-    }, TYPE_MS);
-  }
-  typeLoop();
+  let i = 0;
+  const iv = setInterval(() => {
+    el.textContent = WORD.slice(0, ++i);
+    if (i === WORD.length) {
+      clearInterval(iv);
+      el.classList.add('typed'); // hide cursor — done
+    }
+  }, TYPE_MS);
 })();
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────

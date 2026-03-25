@@ -105,8 +105,9 @@ def reset_room(code: str, new_sentence: str) -> None:
             "ready":    False,
         })
     rtdb.reference(f"/rooms/{code}").update({
-        "status":   "waiting",
-        "sentence": new_sentence,
+        "status":        "waiting",
+        "sentence":      new_sentence,
+        "wantsRematch":  None,
     })
 
 

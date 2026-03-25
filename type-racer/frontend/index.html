@@ -23,7 +23,7 @@
     <header class="header">
       <div class="header-top">
         <div>
-          <h1 class="logo"><span class="logo-text" id="logo-text"></span><span class="logo-dot conn-dot" id="conn-dot" title="Connecting…">.</span></h1>
+          <h1 class="logo"><span class="logo-text" id="logo-text"></span></h1>
           <p class="subtitle">Banglish Office Type Racer</p>
         </div>
 
@@ -230,6 +230,12 @@
       <button class="btn-restart" id="btn-restart">↺ New Race</button>
     </div>
 
+    <!-- Solo result loading overlay (shown between confetti and result modal) -->
+    <div class="result-loading" id="result-loading" aria-hidden="true">
+      <div class="result-loading-spinner"></div>
+      <p class="result-loading-text">Calculating results…</p>
+    </div>
+
     <!-- Result Modal -->
     <div class="result-overlay" id="result-overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Race results">
       <div class="result-modal">
@@ -277,9 +283,48 @@
     <div class="mp-result-modal">
       <h2 class="mp-result-title">Race Results</h2>
       <ol class="mp-result-list" id="mp-result-list"></ol>
-      <button class="btn-restart btn-modal-restart" id="mp-play-again-btn">↺ Play Again</button>
-      <p class="mp-reset-waiting" id="mp-reset-waiting" style="display:none">Waiting for host to start next round…</p>
-      <button class="btn-mp-result-leave" id="mp-result-leave-btn">Leave Room</button>
+
+      <!-- Default action row -->
+      <div id="mp-result-actions">
+        <button class="btn-restart btn-modal-restart" id="mp-play-again-btn">↺ Play Again</button>
+        <button class="btn-mp-result-leave" id="mp-result-leave-btn">Leave Room</button>
+      </div>
+
+      <!-- Host: rematch setup (shown after clicking Play Again) -->
+      <div id="mp-rematch-setup" style="display:none">
+        <p class="mp-rematch-label">Set up next race</p>
+        <div class="mp-section-box">
+          <div class="mp-lines-row">
+            <span class="mp-lines-label">Lines</span>
+            <div class="mp-lines-pills" id="mp-rematch-lines">
+              <button class="mp-line-pill active" data-rematch-count="1">1</button>
+              <button class="mp-line-pill" data-rematch-count="2">2</button>
+              <button class="mp-line-pill" data-rematch-count="3">3</button>
+              <button class="mp-line-pill" data-rematch-count="4">4</button>
+              <button class="mp-line-pill" data-rematch-count="5">5</button>
+            </div>
+          </div>
+          <div class="mp-lines-row">
+            <span class="mp-lines-label">Category</span>
+            <div class="mp-lines-pills" id="mp-rematch-cat">
+              <button class="mp-line-pill active" data-rematch-cat="general">General</button>
+              <button class="mp-line-pill" data-rematch-cat="office">Office</button>
+              <button class="mp-line-pill" data-rematch-cat="food">Food</button>
+              <button class="mp-line-pill" data-rematch-cat="motivation">Motivation</button>
+              <button class="mp-line-pill" data-rematch-cat="love">Love</button>
+            </div>
+          </div>
+        </div>
+        <button class="btn-restart btn-modal-restart" id="mp-start-new-race-btn">▶ Start New Race</button>
+        <button class="btn-mp-result-leave" id="mp-result-leave-btn3">Leave Room</button>
+      </div>
+
+      <!-- Non-host: waiting for host to reset -->
+      <div id="mp-reset-waiting" style="display:none">
+        <div class="mp-processing-spinner"></div>
+        <p>Waiting for host to set up the next race…</p>
+        <button class="btn-mp-result-leave" id="mp-result-leave-btn2">Leave Room</button>
+      </div>
     </div>
   </div>
 
@@ -343,6 +388,12 @@
         <p class="auth-error" id="mp-error"></p>
       </div>
 
+      <!-- View: Loading (auto-join from URL) -->
+      <div id="mp-join-loading-view" style="display:none">
+        <div class="mp-processing-spinner" style="width:32px;height:32px;border-width:3px"></div>
+        <p class="mp-join-loading-msg" id="mp-join-loading-msg">Joining room…</p>
+      </div>
+
       <!-- View: Room lobby (waiting for players / host starts) -->
       <div id="mp-room-view" style="display:none">
 
@@ -376,6 +427,11 @@
       <button class="auth-close" id="auth-modal-close" aria-label="Close">×</button>
       <h2 class="auth-title">Sign In to TaklaType</h2>
       <p class="auth-subtitle">Save your scores and compete on the leaderboard</p>
+
+      <div class="auth-room-notice" id="auth-room-notice" style="display:none">
+        <span>🔗</span>
+        <span id="auth-room-notice-text">Sign in to join the room</span>
+      </div>
 
       <button class="btn-google" id="google-signin">
         <svg width="18" height="18" viewBox="0 0 24 24">

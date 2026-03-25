@@ -48,6 +48,25 @@ async function _initAuth() {
   const emailToggle    = document.getElementById('email-toggle');
   const authError      = document.getElementById('auth-error');
 
+  // Ripple helper — removes then re-adds class to restart animation
+  let _rippleTimer = null;
+  function _ripple() {
+    userPanel.classList.remove('ripple');
+    void userPanel.offsetWidth; // force reflow so animation restarts
+    userPanel.classList.add('ripple');
+  }
+  function _startRippleLoop() {
+    _ripple();
+    _rippleTimer = setInterval(_ripple, 4000); // fire every 4s
+  }
+  function _stopRippleLoop() {
+    clearInterval(_rippleTimer);
+    _rippleTimer = null;
+    userPanel.classList.remove('ripple');
+  }
+  userPanel.addEventListener('animationend', () => userPanel.classList.remove('ripple'));
+  userPanel.addEventListener('mouseenter',   _ripple); // instant re-trigger on hover
+
   // Auth state
   onAuthStateChanged(auth, user => {
     _currentUser = user;
@@ -58,7 +77,9 @@ async function _initAuth() {
       if (user.photoURL) { userAvatar.src = user.photoURL; userAvatar.style.display = 'block'; }
       else { userAvatar.style.display = 'none'; }
       _closeModal();
+      setTimeout(_startRippleLoop, 80);
     } else {
+      _stopRippleLoop();
       authBtn.style.display   = 'flex';
       userPanel.style.display = 'none';
     }
@@ -75,10 +96,16 @@ async function _initAuth() {
   // Google sign-in — popup on desktop, redirect on mobile (avoids Safari popup blocker)
   const provider = new GoogleAuthProvider();
   googleBtn.addEventListener('click', async () => {
+    googleBtn.disabled    = true;
+    googleBtn.textContent = 'Signing in…';
     try {
       if (_isMobile) await signInWithRedirect(auth, provider);
       else           await signInWithPopup(auth, provider);
-    } catch (err) { _showError(err.message); }
+    } catch (err) {
+      _showError(err.message);
+      googleBtn.disabled    = false;
+      googleBtn.textContent = 'Continue with Google';
+    }
   });
 
   // Handle redirect result on page load (mobile sign-in returns here)
@@ -104,11 +131,15 @@ async function _initAuth() {
     e.preventDefault();
     const email = emailInput.value.trim();
     const pw    = passwordInput.value;
+    emailSubmit.disabled    = true;
+    emailSubmit.textContent = _isSignUp ? 'Creating account…' : 'Signing in…';
     try {
       if (_isSignUp) await createUserWithEmailAndPassword(auth, email, pw);
       else           await signInWithEmailAndPassword(auth, email, pw);
     } catch (err) {
       _showError(_friendlyError(err.code));
+      emailSubmit.disabled    = false;
+      emailSubmit.textContent = _isSignUp ? 'Sign Up' : 'Sign In';
     }
   });
 

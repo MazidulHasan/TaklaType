@@ -51,9 +51,35 @@ async function _initMultiplayer() {
   const mpQuitRaceBtn    = document.getElementById('mp-quit-race-btn');
   const mpResultPanel    = document.getElementById('mp-result-panel');
   const mpResultList     = document.getElementById('mp-result-list');
-  const mpPlayAgainBtn   = document.getElementById('mp-play-again-btn');
-  const mpResultLeaveBtn  = document.getElementById('mp-result-leave-btn');
-  const mpResetWaiting    = document.getElementById('mp-reset-waiting');
+  const mpPlayAgainBtn     = document.getElementById('mp-play-again-btn');
+  const mpResultActions    = document.getElementById('mp-result-actions');
+  const mpRematchSetup     = document.getElementById('mp-rematch-setup');
+  const mpStartNewRaceBtn  = document.getElementById('mp-start-new-race-btn');
+  const mpResetWaiting     = document.getElementById('mp-reset-waiting');
+  const mpResultLeaveBtn   = document.getElementById('mp-result-leave-btn');
+  const mpResultLeaveBtn2  = document.getElementById('mp-result-leave-btn2');
+  const mpResultLeaveBtn3  = document.getElementById('mp-result-leave-btn3');
+  const mpJoinLoadingView  = document.getElementById('mp-join-loading-view');
+  const mpJoinLoadingMsg   = document.getElementById('mp-join-loading-msg');
+
+  // Rematch settings (host picks before starting new race)
+  let _rematchLines    = 1;
+  let _rematchCategory = 'general';
+
+  document.querySelectorAll('#mp-rematch-lines .mp-line-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('#mp-rematch-lines .mp-line-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      _rematchLines = parseInt(pill.dataset.rematchCount, 10);
+    });
+  });
+  document.querySelectorAll('#mp-rematch-cat .mp-line-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('#mp-rematch-cat .mp-line-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      _rematchCategory = pill.dataset.rematchCat;
+    });
+  });
   const mpLinePills        = document.querySelectorAll('.mp-line-pill[data-mpcount]');
   const mpCustomToggle     = document.getElementById('mp-custom-toggle');
   const mpCustomInput      = document.getElementById('mp-custom-input');
@@ -129,8 +155,10 @@ async function _initMultiplayer() {
 
   // ── View switcher ───────────────────────────────────────────────────────────
   function _showView(name) {
-    mpLobbyView.style.display = name === 'lobby' ? '' : 'none';
-    mpRoomView.style.display  = name === 'room'  ? '' : 'none';
+    mpLobbyView.style.display      = name === 'lobby'        ? '' : 'none';
+    mpRoomView.style.display       = name === 'room'         ? '' : 'none';
+    if (mpJoinLoadingView)
+      mpJoinLoadingView.style.display = name === 'join-loading' ? '' : 'none';
   }
 
   // ── Create room ─────────────────────────────────────────────────────────────
@@ -188,11 +216,49 @@ async function _initMultiplayer() {
       if (!resp.ok) throw new Error(data.error || 'Failed to join room');
       await _enterRoom(code, data.sentence, false);
     } catch (err) {
+      // If we were in join-loading mode (URL auto-join), switch back to lobby so error is visible
+      if (mpJoinLoadingView && mpJoinLoadingView.style.display !== 'none') {
+        _showView('lobby');
+      }
       mpError.textContent = err.message;
     } finally {
       mpJoinBtn.disabled    = false;
       mpJoinBtn.textContent = 'Join';
     }
+  }
+
+  // ── Helper: reset result panel views to default state ───────────────────────
+  function _resetResultPanel() {
+    if (mpResultActions) mpResultActions.style.display = '';
+    if (mpRematchSetup)  mpRematchSetup.style.display  = 'none';
+    if (mpResetWaiting)  mpResetWaiting.style.display  = 'none';
+    if (mpPlayAgainBtn)  { mpPlayAgainBtn.disabled = false; mpPlayAgainBtn.textContent = '↺ Play Again'; }
+    if (mpStartNewRaceBtn) { mpStartNewRaceBtn.disabled = false; mpStartNewRaceBtn.textContent = '▶ Start New Race'; }
+    _renderWantsRematch({});
+  }
+
+  // ── Render "wants to play again" icons on result rows ────────────────────────
+  function _renderWantsRematch(wantsRematch) {
+    mpResultList.querySelectorAll('[data-uid]').forEach(row => {
+      const icon = row.querySelector('.mp-result-rematch-icon');
+      if (!icon) return;
+      icon.style.visibility = (wantsRematch || {})[row.dataset.uid] ? 'visible' : 'hidden';
+    });
+  }
+
+  // ── Helper: show room lobby after host resets (non-host path) ───────────────
+  function _showRoomAfterReset() {
+    _waitingForReset = false;
+    _resetResultPanel();
+    mpResultPanel.classList.remove('show');
+    _showView('room');
+    mpStartBtn.disabled        = true;
+    mpStartBtn.textContent     = 'Start Race';
+    mpReadyBtn.style.display   = '';
+    mpWaitingMsg.style.display = '';
+    _isReady = false;
+    _updateReadyBtn();
+    mpOverlay.classList.add('show');
   }
 
   // ── Enter room (subscribe to RTDB) ──────────────────────────────────────────
@@ -219,24 +285,17 @@ async function _initMultiplayer() {
 
       // Non-host waiting for host to reset → show room lobby when status returns to waiting
       if (_waitingForReset && room.status === 'waiting') {
-        _waitingForReset = false;
-        if (mpResetWaiting) mpResetWaiting.style.display = 'none';
-        if (mpPlayAgainBtn) mpPlayAgainBtn.style.display = '';
-        mpResultPanel.classList.remove('show');
-        _showView('room');
-        mpStartBtn.disabled        = true;
-        mpStartBtn.textContent     = 'Start Race';
-        mpReadyBtn.style.display   = '';
-        mpWaitingMsg.style.display = '';
-        _isReady = false;
-        _updateReadyBtn();
-        mpOverlay.classList.add('show');
+        _showRoomAfterReset();
         return;
       }
 
       _renderRoomPlayers(room.players || {}, room.hostUid);
       if (room.status === 'racing' && !_raceStarted) _startCountdown(room);
       if (room.status === 'finished' && _raceStarted) _showMpResults(room.players || {});
+      // Update "wants to play again" chips whenever the room snapshot changes
+      if (mpResultPanel && mpResultPanel.classList.contains('show')) {
+        _renderWantsRematch(room.wantsRematch || {});
+      }
     });
 
     _updateUrl(code);
@@ -482,20 +541,22 @@ async function _initMultiplayer() {
     racePanel.style.display = 'none';
     const sorted     = Object.values(players).filter(p => p.finished).sort((a, b) => a.rank - b.rank);
     const unfinished = Object.values(players).filter(p => !p.finished);
-    mpResultList.innerHTML = [...sorted, ...unfinished].map(p => {
+    const sortedUids = [...Object.entries(players).filter(([,p]) => p.finished).sort((a,b) => a[1].rank - b[1].rank),
+                         ...Object.entries(players).filter(([,p]) => !p.finished)];
+    mpResultList.innerHTML = sortedUids.map(([uid, p]) => {
       const pos = p.finished ? `#${p.rank}` : 'DNF';
-      return `<li class="mp-result-row">
+      return `<li class="mp-result-row" data-uid="${_esc(uid)}">
         <span class="mp-result-pos">${pos}</span>
         <span class="mp-result-name">${_esc(p.displayName)}</span>
         <span class="mp-result-wpm">${p.wpm || 0} WPM</span>
+        <span class="mp-result-rematch-icon" style="visibility:hidden" title="Wants to play again">↺</span>
       </li>`;
     }).join('');
     mpResultPanel.classList.add('show');
   }
 
-  // ── Play again ───────────────────────────────────────────────────────────────
+  // ── Play again — host sees rematch setup; non-host waits ────────────────────
   mpPlayAgainBtn.addEventListener('click', async () => {
-    mpResultPanel.classList.remove('show');
     _raceStarted  = false;
     _selfFinished = false;
     _isReady      = false;
@@ -505,33 +566,74 @@ async function _initMultiplayer() {
     if (mpProcessing)     mpProcessing.style.display     = 'none';
     if (mpFinishedNotice) mpFinishedNotice.style.display = 'none';
 
-    if (isHost) {
+    // Write this player's "wants rematch" intent to RTDB so others can see it
+    const _wantUser = getCurrentUser();
+    if (_wantUser && roomCode) {
       try {
-        const token = await getIdToken();
-        await fetch(`${API_BASE}/reset-room/${roomCode}`, {
-          method: 'POST', headers: { Authorization: `Bearer ${token}` },
+        const { ref: dbRef, set: dbSet } =
+          await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js');
+        dbSet(dbRef(rtdb, `/rooms/${roomCode}/wantsRematch/${_wantUser.uid}`), {
+          displayName: _wantUser.displayName || _wantUser.email || 'Player',
+          photoURL:    _wantUser.photoURL || '',
         });
       } catch (_) {}
-      _showView('room');
-      mpStartBtn.disabled    = true;
-      mpStartBtn.textContent = 'Start Race';
-      mpOverlay.classList.add('show');
+    }
+
+    // Keep result panel open — switch to role-specific view
+    mpResultActions.style.display = 'none';
+    if (isHost) {
+      // Sync rematch pills to current selection
+      _rematchLines    = _selectedLines;
+      _rematchCategory = _selectedCategory;
+      document.querySelectorAll('#mp-rematch-lines .mp-line-pill').forEach(p => {
+        p.classList.toggle('active', parseInt(p.dataset.rematchCount, 10) === _rematchLines);
+      });
+      document.querySelectorAll('#mp-rematch-cat .mp-line-pill').forEach(p => {
+        p.classList.toggle('active', p.dataset.rematchCat === _rematchCategory);
+      });
+      mpRematchSetup.style.display = '';
     } else {
-      // Non-host: show waiting spinner until host resets room
+      // Non-host: show waiting, check if host already reset
       _waitingForReset = true;
-      if (mpPlayAgainBtn) mpPlayAgainBtn.style.display = 'none';
-      if (mpResetWaiting) mpResetWaiting.style.display = '';
+      mpResetWaiting.style.display = '';
+      try {
+        const { get } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js');
+        const snap = await get(roomRef);
+        const room = snap.val();
+        if (room && room.status === 'waiting' && _waitingForReset) _showRoomAfterReset();
+      } catch (_) {}
     }
     history.replaceState(null, '', location.pathname);
   });
 
-  // ── Leave from results screen ─────────────────────────────────────────────
-  if (mpResultLeaveBtn) {
-    mpResultLeaveBtn.addEventListener('click', () => {
+  // ── Start New Race (host, from rematch setup) ────────────────────────────────
+  if (mpStartNewRaceBtn) {
+    mpStartNewRaceBtn.addEventListener('click', async () => {
+      mpStartNewRaceBtn.disabled    = true;
+      mpStartNewRaceBtn.textContent = 'Starting…';
+      try {
+        const token = await getIdToken();
+        await fetch(`${API_BASE}/reset-room/${roomCode}?count=${_rematchLines}&category=${_rematchCategory}`, {
+          method: 'POST', headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch (_) {}
+      _resetResultPanel();
+      mpResultPanel.classList.remove('show');
+      _showView('room');
+      mpStartBtn.disabled    = true;
+      mpStartBtn.textContent = 'Start Race';
+      mpOverlay.classList.add('show');
+    });
+  }
+
+  // ── Leave from results screen (all three leave buttons) ─────────────────
+  [mpResultLeaveBtn, mpResultLeaveBtn2, mpResultLeaveBtn3].forEach(btn => {
+    if (btn) btn.addEventListener('click', () => {
+      _resetResultPanel();
       mpResultPanel.classList.remove('show');
       _leaveRoom();
     });
-  }
+  });
 
   // ── Leave room ───────────────────────────────────────────────────────────────
   mpLeaveBtn.addEventListener('click', () => {
@@ -566,8 +668,7 @@ async function _initMultiplayer() {
   function _resetState() {
     roomCode = null; roomSentence = null; isHost = false;
     _raceStarted = false; _selfFinished = false; _isReady = false; _waitingForReset = false;
-    if (mpResetWaiting) mpResetWaiting.style.display = 'none';
-    if (mpPlayAgainBtn) mpPlayAgainBtn.style.display = '';
+    _resetResultPanel();
     if (_raceTimerHandle) { clearInterval(_raceTimerHandle); _raceTimerHandle = null; }
     if (window.__tt) window.__tt.setMultiplayer(false);
     if (mpFinishedNotice) mpFinishedNotice.style.display = 'none';
@@ -591,28 +692,59 @@ async function _initMultiplayer() {
   }
 
   // ── RTDB connection status indicator ────────────────────────────────────────
-  const connDot  = document.getElementById('conn-dot');
-  const connRef  = ref(rtdb, '.info/connected');
+  const userPanel = document.getElementById('user-panel');
+  const connRef   = ref(rtdb, '.info/connected');
   onValue(connRef, snap => {
     const online = snap.val() === true;
-    if (connDot) {
-      connDot.classList.toggle('connected',    online);
-      connDot.classList.toggle('disconnected', !online);
-      connDot.title = online ? 'Connected' : 'Disconnected – reconnecting…';
+    if (userPanel) {
+      userPanel.classList.toggle('connected',    online);
+      userPanel.classList.toggle('disconnected', !online);
+      userPanel.title = online ? 'Connected' : 'Disconnected – reconnecting…';
     }
   });
 
   const urlRoom = new URLSearchParams(location.search).get('room');
   if (urlRoom) {
+    const code = urlRoom.toUpperCase();
     const user = getCurrentUser();
+
     if (user) {
-      _joinByCode(urlRoom.toUpperCase());
+      // Already signed in — show loading state in MP overlay then join
+      if (mpJoinLoadingMsg) mpJoinLoadingMsg.textContent = `Joining room ${code}…`;
+      _showView('join-loading');
+      mpOverlay.classList.add('show');
+      _joinByCode(code);
     } else {
+      // Not signed in — open auth modal with a notice, then auto-join after sign-in
+      const authRoomNotice     = document.getElementById('auth-room-notice');
+      const authRoomNoticeText = document.getElementById('auth-room-notice-text');
+      const authModal          = document.getElementById('auth-modal');
+      if (authRoomNoticeText) authRoomNoticeText.textContent = `Sign in to join room ${code}`;
+      if (authRoomNotice)     authRoomNotice.style.display   = '';
+      if (authModal)          authModal.classList.add('show');
+
+      let _urlJoinDone = false;
       const waitForAuth = setInterval(() => {
         const u = getCurrentUser();
-        if (u) { clearInterval(waitForAuth); _joinByCode(urlRoom.toUpperCase()); }
-      }, 500);
-      setTimeout(() => clearInterval(waitForAuth), 10000);
+        if (u && !_urlJoinDone) {
+          _urlJoinDone = true;
+          clearInterval(waitForAuth);
+          // Hide auth notice and modal, show join loading
+          if (authRoomNotice) authRoomNotice.style.display = 'none';
+          if (authModal)      authModal.classList.remove('show');
+          if (mpJoinLoadingMsg) mpJoinLoadingMsg.textContent = `Joining room ${code}…`;
+          _showView('join-loading');
+          mpOverlay.classList.add('show');
+          _joinByCode(code);
+        }
+      }, 300);
+      // Give up after 2 minutes (user closed modal or gave up)
+      setTimeout(() => {
+        if (!_urlJoinDone) {
+          clearInterval(waitForAuth);
+          if (authRoomNotice) authRoomNotice.style.display = 'none';
+        }
+      }, 120_000);
     }
   }
 }

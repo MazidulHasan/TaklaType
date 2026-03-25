@@ -403,7 +403,12 @@ def finish_player_endpoint(code: str, result: RaceResult, authorization: str = H
 
 
 @app.post("/reset-room/{code}")
-def reset_room_endpoint(code: str, authorization: str = Header(default="")):
+def reset_room_endpoint(
+    code: str,
+    count: int = 1,
+    category: str = "general",
+    authorization: str = Header(default=""),
+):
     """Host resets a finished room back to waiting for another round."""
     user = _verify_auth(authorization)
     if not user:
@@ -418,7 +423,7 @@ def reset_room_endpoint(code: str, authorization: str = Header(default="")):
     if room.get("hostUid") != user["uid"]:
         return JSONResponse(status_code=403, content={"error": "Only the host can reset the room"})
 
-    sentence = " ".join(get_random_sentences(1))
+    sentence = " ".join(get_random_sentences(max(1, count), category))
     reset_room(code.upper(), sentence)
     return {"ok": True, "sentence": sentence}
 
