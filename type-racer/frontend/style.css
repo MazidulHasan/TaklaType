@@ -279,16 +279,20 @@ body {
   display:        inline-block;
   letter-spacing: 2px;
   color:          var(--text);
-  animation: logo-keypress 3s ease-in-out infinite;
-  transform-origin: center bottom;
 }
-@keyframes logo-keypress {
-  0%, 100%  { transform: translateY(0)   scaleY(1);    color: var(--text); }
-  /* key press down */
-  8%        { transform: translateY(3px) scaleY(0.96); color: var(--accent); }
-  /* bounce back up */
-  16%       { transform: translateY(-1px) scaleY(1.01); color: var(--text); }
-  20%, 80%  { transform: translateY(0)   scaleY(1);    color: var(--text); }
+.logo-text::after {
+  content:    '|';
+  color:      var(--accent);
+  opacity:    1;
+  animation:  logo-cursor 0.6s step-end infinite;
+  margin-left: 1px;
+}
+.logo-text.typed::after {
+  display: none;
+}
+@keyframes logo-cursor {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
 }
 
 /* ── Dot base — replaces the conn-dot circle with a styled text character ── */
@@ -1279,6 +1283,28 @@ body {
   border-color: var(--wrong);
   transform:    translateY(-1px);
 }
+.mp-processing {
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  justify-content: center;
+  gap:             0.75rem;
+  padding:         2rem 1rem;
+  color:           var(--muted);
+  font-size:       0.9rem;
+}
+.mp-processing-spinner {
+  width:         28px;
+  height:        28px;
+  border:        3px solid var(--border);
+  border-top:    3px solid var(--accent);
+  border-radius: 50%;
+  animation:     mp-spin 0.8s linear infinite;
+}
+@keyframes mp-spin {
+  to { transform: rotate(360deg); }
+}
+
 .mp-player-bars { display: flex; flex-direction: column; gap: 0.45rem; }
 
 .mp-bar-row {

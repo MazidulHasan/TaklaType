@@ -617,6 +617,39 @@ export function trapFocus(modalEl) {
   return () => modalEl.removeEventListener('keydown', handler);
 }
 
+// ─── Logo typewriter ──────────────────────────────────────────────────────────
+(function logoTypewriter() {
+  const el = document.getElementById('logo-text');
+  if (!el) return;
+  const WORD     = 'TaklaType';
+  const TYPE_MS  = 90;   // delay between each character appearing
+  const HOLD_MS  = 3500; // pause after fully typed
+  const ERASE_MS = 400;  // fade-out duration before retyping
+
+  function typeLoop() {
+    let i = 0;
+    el.classList.remove('typed');
+    el.textContent = '';
+    const iv = setInterval(() => {
+      el.textContent = WORD.slice(0, ++i);
+      if (i === WORD.length) {
+        clearInterval(iv);
+        el.classList.add('typed'); // hide cursor after fully typed
+        setTimeout(() => {
+          el.style.transition = `opacity ${ERASE_MS}ms`;
+          el.style.opacity    = '0';
+          setTimeout(() => {
+            el.style.opacity    = '1';
+            el.style.transition = '';
+            typeLoop();
+          }, ERASE_MS + 100);
+        }, HOLD_MS);
+      }
+    }, TYPE_MS);
+  }
+  typeLoop();
+})();
+
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 loadSettings();
 applySettings();

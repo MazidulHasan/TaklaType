@@ -46,6 +46,8 @@ async function _initMultiplayer() {
   const playerBars       = document.getElementById('mp-player-bars');
   const mpRaceTimer      = document.getElementById('mp-race-timer');
   const mpFinishedNotice = document.getElementById('mp-finished-notice');
+  const mpRaceContent    = document.getElementById('mp-race-content');
+  const mpProcessing     = document.getElementById('mp-processing');
   const mpQuitRaceBtn    = document.getElementById('mp-quit-race-btn');
   const mpResultPanel    = document.getElementById('mp-result-panel');
   const mpResultList     = document.getElementById('mp-result-list');
@@ -341,6 +343,8 @@ async function _initMultiplayer() {
 
   function _beginRace(sentence, deadline) {
     racePanel.style.display = '';
+    if (mpRaceContent)    mpRaceContent.style.display    = '';
+    if (mpProcessing)     mpProcessing.style.display     = 'none';
     if (mpFinishedNotice) mpFinishedNotice.style.display = 'none';
     _selfFinished = false;
     _raceStartMs  = Date.now();
@@ -456,7 +460,9 @@ async function _initMultiplayer() {
     if (!roomCode || !_raceStarted || _selfFinished) return;
     _selfFinished = true;
 
-    // Show "waiting for others" notice in race panel
+    // Hide race content, show processing spinner
+    if (mpRaceContent)    mpRaceContent.style.display    = 'none';
+    if (mpProcessing)     mpProcessing.style.display     = '';
     if (mpFinishedNotice) mpFinishedNotice.style.display = '';
 
     try {
@@ -495,6 +501,8 @@ async function _initMultiplayer() {
     _isReady      = false;
     if (window.__tt) window.__tt.setMultiplayer(false);
     racePanel.style.display = 'none';
+    if (mpRaceContent)    mpRaceContent.style.display    = '';
+    if (mpProcessing)     mpProcessing.style.display     = 'none';
     if (mpFinishedNotice) mpFinishedNotice.style.display = 'none';
 
     if (isHost) {

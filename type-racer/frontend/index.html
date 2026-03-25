@@ -23,7 +23,7 @@
     <header class="header">
       <div class="header-top">
         <div>
-          <h1 class="logo"><span class="logo-text">TaklaType</span><span class="logo-dot conn-dot" id="conn-dot" title="Connecting…">.</span></h1>
+          <h1 class="logo"><span class="logo-text" id="logo-text"></span><span class="logo-dot conn-dot" id="conn-dot" title="Connecting…">.</span></h1>
           <p class="subtitle">Banglish Office Type Racer</p>
         </div>
 
@@ -208,15 +208,21 @@
 
     <!-- Multiplayer opponent progress panel (shown during a multiplayer race) -->
     <div class="mp-race-panel" id="mp-race-panel" style="display:none">
-      <div class="mp-race-header">
-        <p class="mp-race-label">Race in progress</p>
-        <span class="mp-race-timer" id="mp-race-timer">—</span>
+      <div id="mp-race-content">
+        <div class="mp-race-header">
+          <p class="mp-race-label">Race in progress</p>
+          <span class="mp-race-timer" id="mp-race-timer">—</span>
+        </div>
+        <div class="mp-player-bars" id="mp-player-bars"></div>
+        <button class="btn-mp-quit-race" id="mp-quit-race-btn">✕ Leave Race</button>
       </div>
-      <div class="mp-player-bars" id="mp-player-bars"></div>
+      <div class="mp-processing" id="mp-processing" style="display:none">
+        <div class="mp-processing-spinner"></div>
+        <p>Processing results…</p>
+      </div>
       <div class="mp-finished-notice" id="mp-finished-notice" style="display:none">
         ✓ You finished! Waiting for others…
       </div>
-      <button class="btn-mp-quit-race" id="mp-quit-race-btn">✕ Leave Race</button>
     </div>
 
     <!-- Controls -->
