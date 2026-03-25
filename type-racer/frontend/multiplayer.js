@@ -5,6 +5,7 @@
 
 import { rtdb, isConfigured } from './firebase-config.js';
 import { getCurrentUser, getIdToken } from './auth.js';
+import { showToast } from './toast.js';
 
 const API_BASE = (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
   ? 'http://127.0.0.1:8000' : location.origin;
@@ -49,10 +50,16 @@ async function _initMultiplayer() {
   const mpResultPanel    = document.getElementById('mp-result-panel');
   const mpResultList     = document.getElementById('mp-result-list');
   const mpPlayAgainBtn   = document.getElementById('mp-play-again-btn');
-  const mpResultLeaveBtn = document.getElementById('mp-result-leave-btn');
-  const mpLinePills      = document.querySelectorAll('.mp-line-pill');
+  const mpResultLeaveBtn  = document.getElementById('mp-result-leave-btn');
+  const mpResetWaiting    = document.getElementById('mp-reset-waiting');
+  const mpLinePills        = document.querySelectorAll('.mp-line-pill[data-mpcount]');
+  const mpCustomToggle     = document.getElementById('mp-custom-toggle');
+  const mpCustomInput      = document.getElementById('mp-custom-input');
+  const mpCustomSaveRow    = document.getElementById('mp-custom-save-row');
+  const mpCustomSaveCb     = document.getElementById('mp-custom-save-cb');
 
   // ── State ───────────────────────────────────────────────────────────────────
+  let _waitingForReset  = false;
   let roomCode          = null;
   let roomSentence      = null;
   let isHost            = false;
@@ -63,9 +70,22 @@ async function _initMultiplayer() {
   let _raceStarted      = false;
   let _selfFinished     = false;
   let _raceTimerHandle  = null;
+  let _raceStartMs      = 0;
   let _selectedLines    = 1;
+  let _selectedCategory = 'general';
 
-  // ── Lines selector (lobby) ───────────────────────────────────────────────────
+  // ── Custom sentence toggle ───────────────────────────────────────────────────
+  let _useCustomSentence = false;
+  if (mpCustomToggle) {
+    mpCustomToggle.addEventListener('click', () => {
+      _useCustomSentence = !_useCustomSentence;
+      mpCustomToggle.classList.toggle('active', _useCustomSentence);
+      if (mpCustomInput)   mpCustomInput.style.display   = _useCustomSentence ? '' : 'none';
+      if (mpCustomSaveRow) mpCustomSaveRow.style.display = _useCustomSentence ? '' : 'none';
+    });
+  }
+
+  // ── Lines + Category selectors (lobby) ──────────────────────────────────────
   mpLinePills.forEach(pill => {
     pill.addEventListener('click', () => {
       mpLinePills.forEach(p => p.classList.remove('active'));
@@ -74,10 +94,18 @@ async function _initMultiplayer() {
     });
   });
 
+  document.querySelectorAll('#mp-cat-pills .mp-line-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('#mp-cat-pills .mp-line-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      _selectedCategory = pill.dataset.mpcat;
+    });
+  });
+
   // ── Open/close lobby modal ──────────────────────────────────────────────────
   mpBtn.addEventListener('click', () => {
     const user = getCurrentUser();
-    if (!user) { alert('Please sign in to play multiplayer.'); return; }
+    if (!user) { showToast('Please sign in to play multiplayer.', 'info'); return; }
     _showView('lobby');
     mpOverlay.classList.add('show');
     mpError.textContent = '';
@@ -108,9 +136,20 @@ async function _initMultiplayer() {
     mpCreateBtn.textContent = 'Creating…';
     try {
       const token = await getIdToken();
-      const resp  = await fetch(`${API_BASE}/create-room?count=${_selectedLines}`, {
-        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+      const customText = _useCustomSentence ? (mpCustomInput?.value.trim() || '') : '';
+      const resp  = await fetch(`${API_BASE}/create-room?count=${_selectedLines}&category=${_selectedCategory}`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ custom_sentence: customText }),
       });
+      // Optionally save custom sentence to the pool
+      if (customText && mpCustomSaveCb?.checked) {
+        fetch(`${API_BASE}/add-sentence`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body:    JSON.stringify({ sentence: customText, category: _selectedCategory }),
+        }).catch(() => {});
+      }
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'Failed to create room');
       await _enterRoom(data.code, data.sentence, true);
@@ -171,6 +210,24 @@ async function _initMultiplayer() {
     unsubRoom = onValue(roomRef, snap => {
       const room = snap.val();
       if (!room) { _handleRoomDeleted(); return; }
+
+      // Non-host waiting for host to reset → show room lobby when status returns to waiting
+      if (_waitingForReset && room.status === 'waiting') {
+        _waitingForReset = false;
+        if (mpResetWaiting) mpResetWaiting.style.display = 'none';
+        if (mpPlayAgainBtn) mpPlayAgainBtn.style.display = '';
+        mpResultPanel.classList.remove('show');
+        _showView('room');
+        mpStartBtn.disabled        = true;
+        mpStartBtn.textContent     = 'Start Race';
+        mpReadyBtn.style.display   = '';
+        mpWaitingMsg.style.display = '';
+        _isReady = false;
+        _updateReadyBtn();
+        mpOverlay.classList.add('show');
+        return;
+      }
+
       _renderRoomPlayers(room.players || {}, room.hostUid);
       if (room.status === 'racing' && !_raceStarted) _startCountdown(room);
       if (room.status === 'finished' && _raceStarted) _showMpResults(room.players || {});
@@ -256,6 +313,11 @@ async function _initMultiplayer() {
     if (_raceStarted) return;
     _raceStarted = true;
 
+    // Compute deadline from server timestamp so all clients agree
+    // startedAt is Firebase server ms; add 3700ms for the countdown display
+    const serverNow = room.startedAt || Date.now();
+    const deadline  = serverNow + 3700 + (room.duration || 120) * 1000;
+
     mpOverlay.classList.remove('show');
     cdOverlay.classList.add('show');
 
@@ -268,26 +330,32 @@ async function _initMultiplayer() {
       cdNum.textContent = 'GO!';
       setTimeout(() => {
         cdOverlay.classList.remove('show');
-        _beginRace(room.sentence || roomSentence, room.duration || 120);
+        _beginRace(room.sentence || roomSentence, deadline);
       }, 700);
     }, 1000);
   }
 
-  function _beginRace(sentence, duration) {
+  function _beginRace(sentence, deadline) {
     racePanel.style.display = '';
     if (mpFinishedNotice) mpFinishedNotice.style.display = 'none';
     _selfFinished = false;
+    _raceStartMs  = Date.now();
+    // Hide solo controls during multiplayer race
+    const lineSel  = document.querySelector('.line-selector');
+    const controls = document.querySelector('.controls');
+    if (lineSel)  lineSel.style.display  = 'none';
+    if (controls) controls.style.display = 'none';
     if (window.__tt) {
       window.__tt.setMultiplayer(true);
       window.__tt.startRound(sentence);
     }
     _listenProgress();
-    _startRaceTimer(duration);
+    _startRaceTimer(deadline);
   }
 
-  // ── Race countdown timer ─────────────────────────────────────────────────────
-  function _startRaceTimer(duration) {
-    const endTime = Date.now() + duration * 1000;
+  // ── Race countdown timer (deadline = absolute ms timestamp) ──────────────────
+  function _startRaceTimer(deadline) {
+    const endTime = deadline;
     if (_raceTimerHandle) clearInterval(_raceTimerHandle);
 
     _raceTimerHandle = setInterval(async () => {
@@ -312,10 +380,11 @@ async function _initMultiplayer() {
               const wpm   = parseInt(document.getElementById('wpm')?.textContent || '0', 10);
               const acc   = parseInt(document.getElementById('accuracy')?.textContent || '0', 10);
               const errs  = parseInt(document.getElementById('errors')?.textContent  || '0', 10);
+              const elapsed = Math.round((Date.now() - _raceStartMs) / 1000);
               await fetch(`${API_BASE}/finish-player/${roomCode}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ wpm, accuracy: acc, errors: errs, time: duration }),
+                body: JSON.stringify({ wpm, accuracy: acc, errors: errs, time: elapsed }),
               });
             } catch (_) {}
           }
@@ -348,7 +417,11 @@ async function _initMultiplayer() {
       const you    = uid === user?.uid ? ' (you)' : '';
       const pct    = Math.min(p.progress || 0, 100);
       const finTag = p.finished ? ` <span class="mp-bar-rank">#${p.rank}</span>` : '';
+      const avatar = p.photoURL
+        ? `<img class="mp-bar-avatar" src="${_esc(p.photoURL)}" alt="" onerror="this.style.display='none'">`
+        : `<span class="mp-bar-avatar-fb">${_esc((p.displayName || '?')[0].toUpperCase())}</span>`;
       return `<div class="mp-bar-row">
+        ${avatar}
         <span class="mp-bar-name">${_esc(p.displayName)}${you}</span>
         <div class="mp-bar-track">
           <div class="mp-bar-fill" style="width:${pct}%"></div>
@@ -426,17 +499,16 @@ async function _initMultiplayer() {
           method: 'POST', headers: { Authorization: `Bearer ${token}` },
         });
       } catch (_) {}
+      _showView('room');
+      mpStartBtn.disabled    = true;
+      mpStartBtn.textContent = 'Start Race';
+      mpOverlay.classList.add('show');
+    } else {
+      // Non-host: show waiting spinner until host resets room
+      _waitingForReset = true;
+      if (mpPlayAgainBtn) mpPlayAgainBtn.style.display = 'none';
+      if (mpResetWaiting) mpResetWaiting.style.display = '';
     }
-
-    _showView('room');
-    mpStartBtn.disabled    = true;
-    mpStartBtn.textContent = 'Start Race';
-    if (!isHost) {
-      mpReadyBtn.style.display   = '';
-      mpWaitingMsg.style.display = '';
-      _updateReadyBtn();
-    }
-    mpOverlay.classList.add('show');
     history.replaceState(null, '', location.pathname);
   });
 
@@ -474,13 +546,15 @@ async function _initMultiplayer() {
     if (unsubRoom) { off(roomRef); unsubRoom = null; }
     _resetState();
     mpOverlay.classList.remove('show');
-    alert('The room was closed by the host.');
+    showToast('The room was closed by the host.', 'info');
     history.replaceState(null, '', location.pathname);
   }
 
   function _resetState() {
     roomCode = null; roomSentence = null; isHost = false;
-    _raceStarted = false; _selfFinished = false; _isReady = false;
+    _raceStarted = false; _selfFinished = false; _isReady = false; _waitingForReset = false;
+    if (mpResetWaiting) mpResetWaiting.style.display = 'none';
+    if (mpPlayAgainBtn) mpPlayAgainBtn.style.display = '';
     if (_raceTimerHandle) { clearInterval(_raceTimerHandle); _raceTimerHandle = null; }
     if (window.__tt) window.__tt.setMultiplayer(false);
     if (mpFinishedNotice) mpFinishedNotice.style.display = 'none';
@@ -494,6 +568,18 @@ async function _initMultiplayer() {
   function _updateUrl(code) {
     history.replaceState(null, '', `${location.pathname}?room=${code}`);
   }
+
+  // ── RTDB connection status indicator ────────────────────────────────────────
+  const connDot  = document.getElementById('conn-dot');
+  const connRef  = ref(rtdb, '.info/connected');
+  onValue(connRef, snap => {
+    const online = snap.val() === true;
+    if (connDot) {
+      connDot.classList.toggle('connected',    online);
+      connDot.classList.toggle('disconnected', !online);
+      connDot.title = online ? 'Connected' : 'Disconnected – reconnecting…';
+    }
+  });
 
   const urlRoom = new URLSearchParams(location.search).get('room');
   if (urlRoom) {

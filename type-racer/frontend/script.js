@@ -63,21 +63,33 @@ let elapsedSeconds     = 0;
 let totalErrors        = 0;
 let finished           = false;
 let selectedLines      = 1;
+let selectedCategory   = 'general';
+let keyErrors          = {}; // char → error count
 let confettiRafId      = null;
 let lastParticleMs     = 0;
 
 // ─── Settings State ───────────────────────────────────────────────────────────
+const PARTICLE_STYLES = ['off', 'sparkle', 'fire', 'ash', 'snow', 'stars', 'bubbles'];
+
 const settings = {
-  sound:     false,
-  timer:     true,
-  particles: true,
-  fontSize:  'medium',
-  theme:     'dark',
+  sound:         false,
+  timer:         true,
+  particleStyle: 'sparkle',
+  fontSize:      'medium',
+  theme:         'dark',
 };
 
 function loadSettings() {
   const saved = localStorage.getItem('taklatype-settings');
-  if (saved) Object.assign(settings, JSON.parse(saved));
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    // Migrate old boolean particles → particleStyle
+    if ('particles' in parsed && !('particleStyle' in parsed)) {
+      parsed.particleStyle = parsed.particles ? 'sparkle' : 'off';
+      delete parsed.particles;
+    }
+    Object.assign(settings, parsed);
+  }
 }
 
 function saveSettings() {
@@ -100,7 +112,8 @@ function applySettings() {
   if (timerItem) timerItem.style.display = settings.timer ? '' : 'none';
   document.getElementById('toggle-timer').classList.toggle('active', settings.timer);
   document.getElementById('toggle-sound').classList.toggle('active', settings.sound);
-  document.getElementById('toggle-particles').classList.toggle('active', settings.particles);
+  const label = document.getElementById('particle-style-label');
+  if (label) label.textContent = settings.particleStyle;
 }
 
 // ─── Audio ────────────────────────────────────────────────────────────────────
@@ -161,18 +174,32 @@ document.getElementById('toggle-timer').addEventListener('click', () => {
   applySettings();
 });
 
-document.getElementById('toggle-particles').addEventListener('click', () => {
-  settings.particles = !settings.particles;
-  saveSettings();
-  applySettings();
+document.getElementById('particle-prev').addEventListener('click', () => {
+  const i = PARTICLE_STYLES.indexOf(settings.particleStyle);
+  settings.particleStyle = PARTICLE_STYLES[(i - 1 + PARTICLE_STYLES.length) % PARTICLE_STYLES.length];
+  saveSettings(); applySettings();
+});
+document.getElementById('particle-next').addEventListener('click', () => {
+  const i = PARTICLE_STYLES.indexOf(settings.particleStyle);
+  settings.particleStyle = PARTICLE_STYLES[(i + 1) % PARTICLE_STYLES.length];
+  saveSettings(); applySettings();
 });
 
 // ─── Line Count Selector ──────────────────────────────────────────────────────
 document.querySelectorAll('.pill').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.pill[data-count]').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     selectedLines = parseInt(btn.dataset.count, 10);
+    fetchSentence();
+  });
+});
+
+document.querySelectorAll('.pill[data-solocat]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.pill[data-solocat]').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    selectedCategory = btn.dataset.solocat;
     fetchSentence();
   });
 });
@@ -199,7 +226,7 @@ async function fetchSentence() {
   sentenceContainer.classList.remove('hide-hint');
 
   try {
-    const res  = await fetch(`${API_BASE}/get-sentences?count=${selectedLines}`);
+    const res  = await fetch(`${API_BASE}/get-sentences?count=${selectedLines}&category=${selectedCategory}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
@@ -227,6 +254,7 @@ function initRound() {
   typedChars     = Array(targetSentence.length).fill('remaining');
   cursorIndex    = 0;
   totalErrors    = 0;
+  keyErrors      = {};
   elapsedSeconds = 0;
   finished       = false;
 
@@ -332,19 +360,46 @@ function rollup(el, to, suffix, ms) {
   })(t0);
 }
 
+// ─── Key Error Heatmap ────────────────────────────────────────────────────────
+const KEYBOARD_ROWS = [
+  ['q','w','e','r','t','y','u','i','o','p'],
+  ['a','s','d','f','g','h','j','k','l'],
+  ['z','x','c','v','b','n','m',' '],
+];
+
+function renderHeatmap() {
+  const section  = document.getElementById('heatmap-section');
+  const keyboard = document.getElementById('heatmap-keyboard');
+  if (!keyboard || Object.keys(keyErrors).length === 0) {
+    if (section) section.style.display = 'none';
+    return;
+  }
+  const maxErr = Math.max(...Object.values(keyErrors));
+  keyboard.innerHTML = KEYBOARD_ROWS.map(row =>
+    `<div class="hk-row">${row.map(key => {
+      const errs     = keyErrors[key] || 0;
+      const heat     = errs > 0 ? Math.ceil((errs / maxErr) * 4) : 0; // 0–4
+      const label    = key === ' ' ? '␣' : key.toUpperCase();
+      return `<span class="hk-key heat-${heat}" title="${errs} mistake${errs !== 1 ? 's' : ''}">${label}</span>`;
+    }).join('')}</div>`
+  ).join('');
+  if (section) section.style.display = '';
+}
+
 // ─── Keystroke particle ───────────────────────────────────────────────────────
 function spawnParticle(charIndex) {
-  if (!settings.particles) return;
+  if (settings.particleStyle === 'off') return;
   const now = Date.now();
   if (now - lastParticleMs < 40) return;
   lastParticleMs = now;
   const span = sentenceDisplay.children[charIndex];
   if (!span) return;
-  const r = span.getBoundingClientRect();
-  const p = document.createElement('span');
-  p.className  = 'particle';
-  p.style.left = `${r.left + r.width / 2 - 3.5}px`;
-  p.style.top  = `${r.top  + r.height / 2 - 3.5}px`;
+  const r   = span.getBoundingClientRect();
+  const p   = document.createElement('span');
+  const off = settings.particleStyle === 'sparkle' ? 3.5 : 5;
+  p.className  = `particle particle-${settings.particleStyle}`;
+  p.style.left = `${r.left + r.width  / 2 - off}px`;
+  p.style.top  = `${r.top  + r.height / 2 - off}px`;
   document.body.appendChild(p);
   p.addEventListener('animationend', () => p.remove(), { once: true });
 }
@@ -440,6 +495,9 @@ function handleCharInput(char) {
   } else {
     totalErrors++;
     errorsEl.textContent = totalErrors;
+    // Track which character was expected (for heatmap)
+    const expectedChar = targetSentence[idx] || '';
+    if (expectedChar) keyErrors[expectedChar] = (keyErrors[expectedChar] || 0) + 1;
     pulse(errorsEl);
     shakeContainer();
     playErrorSound();
@@ -519,6 +577,7 @@ async function finishRound() {
     rollup(resultAccEl,  acc,         '%', 700);
     rollup(resultErrEl,  totalErrors, '',  500);
     rollup(resultTimeEl, secs,        's', 600);
+    renderHeatmap();
     showResult();
   }, 450);
 }
@@ -541,6 +600,22 @@ window.addEventListener('resize', () => {
   confettiCanvas.width  = window.innerWidth;
   confettiCanvas.height = window.innerHeight;
 });
+
+// ─── Accessibility: focus trap for modals ─────────────────────────────────────
+export function trapFocus(modalEl) {
+  const focusable = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  const els       = [...modalEl.querySelectorAll(focusable)].filter(el => !el.closest('[style*="display: none"]'));
+  if (!els.length) return () => {};
+  const first = els[0], last = els[els.length - 1];
+  function handler(e) {
+    if (e.key !== 'Tab') return;
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+  modalEl.addEventListener('keydown', handler);
+  first.focus();
+  return () => modalEl.removeEventListener('keydown', handler);
+}
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 loadSettings();

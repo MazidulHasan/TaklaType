@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
+  <a href="#typing-input" class="skip-nav">Skip to typing area</a>
 
   <canvas id="confetti-canvas"></canvas>
 
@@ -28,6 +29,8 @@
 
         <!-- Header action buttons -->
         <div class="header-actions">
+          <!-- Firebase connection status dot -->
+          <span class="conn-dot" id="conn-dot" title="Connecting…"></span>
 
           <!-- Multiplayer button -->
           <button class="header-icon-btn" id="mp-btn" title="Multiplayer">
@@ -128,12 +131,14 @@
                   <span class="toggle-knob"></span>
                 </span>
               </label>
-              <label class="toggle-row">
+              <div class="toggle-row" style="align-items:center">
                 <span class="toggle-label">Keystroke particles</span>
-                <span class="toggle-switch active" id="toggle-particles">
-                  <span class="toggle-knob"></span>
-                </span>
-              </label>
+                <div class="particle-picker">
+                  <button class="particle-picker-btn" id="particle-prev" aria-label="Previous particle style">‹</button>
+                  <span class="particle-picker-label" id="particle-style-label">sparkle</span>
+                  <button class="particle-picker-btn" id="particle-next" aria-label="Next particle style">›</button>
+                </div>
+              </div>
 
             </div>
           </div>
@@ -150,7 +155,7 @@
     </header>
 
     <!-- Stats Bar -->
-    <div class="stats-bar">
+    <div class="stats-bar" role="status" aria-live="polite" aria-atomic="false">
       <div class="stat-item">
         <span class="stat-label">Timer</span>
         <span class="stat-value" id="timer">00:00</span>
@@ -184,6 +189,14 @@
         <button class="pill"        data-count="4">4</button>
         <button class="pill"        data-count="5">5</button>
       </div>
+      <span class="line-selector-label" style="margin-left:0.8rem">Category</span>
+      <div class="line-selector-pills" id="solo-cat-pills">
+        <button class="pill active" data-solocat="general">General</button>
+        <button class="pill" data-solocat="office">Office</button>
+        <button class="pill" data-solocat="food">Food</button>
+        <button class="pill" data-solocat="motivation">Motivation</button>
+        <button class="pill" data-solocat="love">Love</button>
+      </div>
     </div>
 
     <!-- Sentence Display -->
@@ -201,12 +214,12 @@
       <div class="mp-race-header">
         <p class="mp-race-label">Race in progress</p>
         <span class="mp-race-timer" id="mp-race-timer">—</span>
-        <button class="btn-mp-quit-race" id="mp-quit-race-btn">Leave Race</button>
       </div>
       <div class="mp-player-bars" id="mp-player-bars"></div>
       <div class="mp-finished-notice" id="mp-finished-notice" style="display:none">
         ✓ You finished! Waiting for others…
       </div>
+      <button class="btn-mp-quit-race" id="mp-quit-race-btn">✕ Leave Race</button>
     </div>
 
     <!-- Controls -->
@@ -215,7 +228,7 @@
     </div>
 
     <!-- Result Modal -->
-    <div class="result-overlay" id="result-overlay" aria-hidden="true">
+    <div class="result-overlay" id="result-overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Race results">
       <div class="result-modal">
         <h2 class="result-title">Race Complete!</h2>
         <div class="result-grid">
@@ -237,11 +250,19 @@
           </div>
         </div>
         <p class="result-save-status" id="result-save-status"></p>
+        <!-- Key error heatmap -->
+        <div class="heatmap-section" id="heatmap-section" style="display:none">
+          <p class="heatmap-label">Most missed keys</p>
+          <div class="heatmap-keyboard" id="heatmap-keyboard"></div>
+        </div>
         <button class="btn-restart btn-modal-restart" id="btn-modal-restart">↺ Play Again</button>
       </div>
     </div>
 
   </div>
+
+  <!-- Toast notification container -->
+  <div class="toast-container" id="toast-container" aria-live="assertive" aria-atomic="true"></div>
 
   <!-- Multiplayer countdown overlay -->
   <div class="mp-countdown-overlay" id="mp-countdown-overlay">
@@ -254,12 +275,13 @@
       <h2 class="mp-result-title">Race Results</h2>
       <ol class="mp-result-list" id="mp-result-list"></ol>
       <button class="btn-restart btn-modal-restart" id="mp-play-again-btn">↺ Play Again</button>
+      <p class="mp-reset-waiting" id="mp-reset-waiting" style="display:none">Waiting for host to start next round…</p>
       <button class="btn-mp-result-leave" id="mp-result-leave-btn">Leave Room</button>
     </div>
   </div>
 
   <!-- Multiplayer lobby/room modal -->
-  <div class="mp-overlay" id="mp-overlay">
+  <div class="mp-overlay" id="mp-overlay" role="dialog" aria-modal="true" aria-label="Multiplayer">
     <div class="mp-modal">
       <button class="auth-close" id="mp-close-btn" aria-label="Close">×</button>
 
@@ -268,7 +290,7 @@
         <h2 class="auth-title">Multiplayer</h2>
         <p class="auth-subtitle">Race against your friends in real time</p>
 
-        <!-- Lines selector for the room creator -->
+        <!-- Lines selector -->
         <div class="mp-lines-row">
           <span class="mp-lines-label">Lines</span>
           <div class="mp-lines-pills">
@@ -278,6 +300,29 @@
             <button class="mp-line-pill" data-mpcount="4">4</button>
             <button class="mp-line-pill" data-mpcount="5">5</button>
           </div>
+        </div>
+        <!-- Category selector -->
+        <div class="mp-lines-row">
+          <span class="mp-lines-label">Category</span>
+          <div class="mp-lines-pills" id="mp-cat-pills">
+            <button class="mp-line-pill active" data-mpcat="general">General</button>
+            <button class="mp-line-pill" data-mpcat="office">Office</button>
+            <button class="mp-line-pill" data-mpcat="food">Food</button>
+            <button class="mp-line-pill" data-mpcat="motivation">Motivation</button>
+            <button class="mp-line-pill" data-mpcat="love">Love</button>
+          </div>
+        </div>
+
+        <!-- Optional custom sentence -->
+        <div class="mp-custom-row">
+          <label class="mp-custom-toggle-row">
+            <span class="mp-lines-label">Custom sentence</span>
+            <span class="toggle-switch" id="mp-custom-toggle"><span class="toggle-knob"></span></span>
+          </label>
+          <textarea class="mp-custom-input" id="mp-custom-input" placeholder="Type your custom sentence here…" rows="2" style="display:none"></textarea>
+          <label class="mp-custom-save-row" id="mp-custom-save-row" style="display:none">
+            <input type="checkbox" id="mp-custom-save-cb"> <span>Save this sentence to the pool</span>
+          </label>
         </div>
 
         <button class="btn-mp-create" id="mp-create-btn">+ Create Room</button>
@@ -322,7 +367,7 @@
   </div>
 
   <!-- Auth Modal -->
-  <div class="auth-overlay" id="auth-modal">
+  <div class="auth-overlay" id="auth-modal" role="dialog" aria-modal="true" aria-label="Sign in">
     <div class="auth-modal">
       <button class="auth-close" id="auth-modal-close" aria-label="Close">×</button>
       <h2 class="auth-title">Sign In to TaklaType</h2>

@@ -1,30 +1,57 @@
 ami ajke office e late esechi
 boss ajke khub serious mood e
-release date ajke push hoye gelo
-meeting ta cancel hoye gelo last minute e
-ami chai lunch break e ghore jaite
-project deadline kal kintu kono kaj hoy nai
-client er feedback ta completely ulta
-stand up meeting e boro kore mitha bolsi
-server down hoye gese production e
-keo chai na weekend e kaj korte
-amader team ta khub bhalo kaj kore
-design review e sবাই agree korlona
-code review comments dite boss bhule geche
-deployment script ta kaj korche na akhon
-database backup neowa hoy nai onek din
-new feature request esecho again client er theke
-bug ta khuje pawa jacche na kono vabe
-ami aaj office e first time on time eseci
-test case gulo pass korche na ekta o
-documentation likhte hobe sesh e sob kichu shesh hoile
-meeting er por meeting sesh hoi na kono din
-wifi speed ta aaj khub slow lagche
-laptop ta hang korche boro file khulte gele
-product manager er email ta bujhte parcina
-aaj raat 12 tar age jete parbo na bari
-sprint planning e estimated time ta fele disi
-ami vebecilam kal deploy korbo kintu parini
-CI CD pipeline ta fail korche boro ei
-QA team ta bug report diache 20 ta naey
-ami janina keno ei error ta ashe akhono
+kalke meeting ta besh boring chilo
+ami coffee na kheley kaj korte pari na
+ajke release date niye sobai tension e
+amar teammate ajke sick leave niyeche
+kalke standup meeting e ami ghumiye chilam
+ami ajke code e ekta funny bug peyechi
+boss bollo eta urgent fix korte hobe
+ami lunch e biryani kheye full hoye gechi
+project manager ajke khub excited chilo
+kalke demo te sob thik moto chole nai
+amar colleague sob somoy late ashe
+ajke testing e onek bug dhora porse
+ami ajke notun feature develop kortesi
+release er age sobai panic mood e
+ami commit kore push dite bhule gechi
+kalke client meeting ta besh funny chilo
+boss jokhon call kore tokhon sobai chup hoye jai
+ami ajke jira ticket gulo finish kortesi
+amar teammate sob somoy meme share kore
+lunch break e sobai golpo kore
+ami ajke production e bug diye diyechi
+kalke hotfix deploy korte hobe
+boss bolse documentation update korte hobe
+ajke server slow chilo tai kaj slow chilo
+ami ajke test case likhte boshechi
+team lead ajke sobai ke treat dilo
+ami ajke coffee spill kore fellam
+kalke code review e amar code reject hoise
+ami ajke git conflict e pore gechi
+boss bolse eta high priority issue
+ami ajke staging e test kortesi
+kalke production deploy hobe
+team er sobai ajke funny mood e
+ami ajke new joiner ke help kortesi
+kalke training session chilo
+ami ajke bug fix korte korte tired hoye gechi
+boss bolse eta quick fix korte hobe
+kalke sobai early leave niyeche
+ami ajke report banacchi
+team lead ajke khub friendly chilo
+kalke deploy er por sob crash kore gelo
+ami ajke log check kortesi
+boss bolse rollback korte hobe
+ami ajke root cause analysis kortesi
+kalke client khub happy chilo
+ami ajke test environment setup kortesi
+team e ajke cake kata holo
+ami ajke overtime kortesi
+boss bolse eta must fix issue
+ami ajke meeting e late join korechi
+kalke production e sob smooth chilo
+ami ajke sprint planning e boshechi
+team e ajke onek hashi moja chilo
+ami ajke ekta tricky bug solve korechi
+kalke release ta finally successful holo

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaklaType Admin</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    body { padding: 2rem; }
+    .admin-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; }
+    .admin-title  { font-size: 1.4rem; font-weight: 700; color: var(--accent); font-family: 'Courier New', monospace; }
+    .admin-grid   { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+    .admin-card   { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem 1.5rem; }
+    .admin-card-title { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 0.8rem; }
+    .admin-stat   { font-size: 2.5rem; font-weight: 700; color: var(--accent); font-family: 'Courier New', monospace; }
+    .admin-table  { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .admin-table th { color: var(--muted); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; padding: 0.3rem 0; text-align: left; border-bottom: 1px solid var(--border); }
+    .admin-table td { padding: 0.4rem 0.3rem; color: var(--text); border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
+    .badge-racing  { background: color-mix(in srgb, var(--correct) 20%, transparent); color: var(--correct); border: 1px solid var(--correct); border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.65rem; font-weight: 700; }
+    .badge-waiting { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.65rem; font-weight: 700; }
+    .badge-finished{ background: var(--surface2); color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.65rem; }
+    #admin-error   { color: var(--wrong); margin-top: 2rem; font-size: 0.9rem; text-align: center; }
+    #admin-loading { color: var(--muted); margin-top: 2rem; font-size: 0.9rem; text-align: center; }
+    .btn-refresh   { background: transparent; border: 1.5px solid var(--border); border-radius: 8px; color: var(--muted); font-family: 'Courier New', monospace; font-size: 0.78rem; padding: 0.35rem 0.9rem; cursor: pointer; margin-left: auto; transition: border-color 0.15s, color 0.15s; }
+    .btn-refresh:hover { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<div class="admin-header">
+  <span class="admin-title">TaklaType Admin</span>
+  <button class="btn-refresh" id="btn-refresh">↺ Refresh</button>
+</div>
+
+<div id="admin-loading">Signing in…</div>
+<div id="admin-error"  style="display:none"></div>
+
+<div id="admin-content" style="display:none">
+  <div class="admin-grid">
+
+    <div class="admin-card">
+      <p class="admin-card-title">Total Races Played</p>
+      <div class="admin-stat" id="stat-total">—</div>
+    </div>
+
+    <div class="admin-card">
+      <p class="admin-card-title">Active Rooms</p>
+      <div class="admin-stat" id="stat-rooms">—</div>
+    </div>
+
+    <div class="admin-card" style="grid-column: 1 / -1">
+      <p class="admin-card-title">Live Rooms</p>
+      <table class="admin-table">
+        <thead><tr><th>Code</th><th>Status</th><th>Players</th><th>Created</th></tr></thead>
+        <tbody id="rooms-body"><tr><td colspan="4" style="color:var(--muted)">No rooms</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="admin-card" style="grid-column: 1 / -1">
+      <p class="admin-card-title">Leaderboard (Top 20)</p>
+      <table class="admin-table">
+        <thead><tr><th>#</th><th>Name</th><th>WPM</th><th>UID</th></tr></thead>
+        <tbody id="lb-body"><tr><td colspan="4" style="color:var(--muted)">No data</td></tr></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp }  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyBNSRYsgWPfvHzR8tYYJi1UX9BH26peqxg",
+  authDomain:        "taklatype.firebaseapp.com",
+  projectId:         "taklatype",
+  storageBucket:     "taklatype.firebasestorage.app",
+  messagingSenderId: "209923553049",
+  appId:             "1:209923553049:web:f0f36448ceb668ebdf7788",
+  databaseURL:       "https://taklatype-default-rtdb.firebaseio.com",
+};
+
+const API_BASE = (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+  ? 'http://127.0.0.1:8000' : location.origin;
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+const loadingEl  = document.getElementById('admin-loading');
+const errorEl    = document.getElementById('admin-error');
+const contentEl  = document.getElementById('admin-content');
+const statTotal  = document.getElementById('stat-total');
+const statRooms  = document.getElementById('stat-rooms');
+const roomsBody  = document.getElementById('rooms-body');
+const lbBody     = document.getElementById('lb-body');
+const btnRefresh = document.getElementById('btn-refresh');
+
+let _token = null;
+
+onAuthStateChanged(auth, async user => {
+  if (!user) {
+    loadingEl.textContent = 'Not signed in. Please sign in at the main app first.';
+    return;
+  }
+  _token = await user.getIdToken();
+  loadData();
+});
+
+btnRefresh.addEventListener('click', loadData);
+
+async function loadData() {
+  if (!_token) return;
+  loadingEl.style.display  = '';
+  contentEl.style.display  = 'none';
+  errorEl.style.display    = 'none';
+  loadingEl.textContent    = 'Loading…';
+
+  try {
+    const resp = await fetch(`${API_BASE}/admin-data`, {
+      headers: { Authorization: `Bearer ${_token}` },
+    });
+    if (!resp.ok) {
+      const d = await resp.json();
+      throw new Error(d.error || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+
+    statTotal.textContent = data.total_races ?? '—';
+    statRooms.textContent = data.rooms.length;
+
+    // Rooms table
+    roomsBody.innerHTML = data.rooms.length
+      ? data.rooms.map(r => {
+          const created = r.createdAt ? new Date(r.createdAt).toLocaleTimeString() : '—';
+          const badge   = `<span class="badge-${r.status}">${r.status}</span>`;
+          return `<tr><td><b>${r.code}</b></td><td>${badge}</td><td>${r.players}</td><td>${created}</td></tr>`;
+        }).join('')
+      : '<tr><td colspan="4" style="color:var(--muted)">No active rooms</td></tr>';
+
+    // Leaderboard table
+    lbBody.innerHTML = data.leaderboard.length
+      ? data.leaderboard.map((p, i) =>
+          `<tr><td>${i + 1}</td><td>${_esc(p.name || 'Unknown')}</td><td style="color:var(--correct);font-weight:700">${p.wpm}</td><td style="color:var(--muted);font-size:0.72rem">${p.uid}</td></tr>`
+        ).join('')
+      : '<tr><td colspan="4" style="color:var(--muted)">No leaderboard data</td></tr>';
+
+    loadingEl.style.display = 'none';
+    contentEl.style.display = '';
+  } catch (err) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display   = '';
+    errorEl.textContent     = `Error: ${err.message}`;
+  }
+}
+
+function _esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

@@ -23,9 +23,11 @@ if (!isConfigured) {
 }
 
 // ─── Full auth implementation ─────────────────────────────────────────────
+const _isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
 async function _initAuth() {
   const {
-    GoogleAuthProvider, signInWithPopup,
+    GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
     signInWithEmailAndPassword, createUserWithEmailAndPassword,
     signOut, onAuthStateChanged,
   } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
@@ -70,12 +72,22 @@ async function _initAuth() {
   authModalClose.addEventListener('click', _closeModal);
   authModal.addEventListener('click', e => { if (e.target === authModal) _closeModal(); });
 
-  // Google sign-in
+  // Google sign-in — popup on desktop, redirect on mobile (avoids Safari popup blocker)
   const provider = new GoogleAuthProvider();
   googleBtn.addEventListener('click', async () => {
-    try { await signInWithPopup(auth, provider); }
-    catch (err) { _showError(err.message); }
+    try {
+      if (_isMobile) await signInWithRedirect(auth, provider);
+      else           await signInWithPopup(auth, provider);
+    } catch (err) { _showError(err.message); }
   });
+
+  // Handle redirect result on page load (mobile sign-in returns here)
+  try {
+    const result = await getRedirectResult(auth);
+    if (result?.user) _closeModal();
+  } catch (err) {
+    if (err.code !== 'auth/no-auth-event') _showError(err.message);
+  }
 
   // Email sign-in / sign-up toggle
   let _isSignUp = false;

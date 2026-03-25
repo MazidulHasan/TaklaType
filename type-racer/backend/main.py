@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from backend.sentence_loader import load_sentences, get_random_sentence, get_random_sentences
+from backend.sentence_loader import load_sentences, get_random_sentence, get_random_sentences, append_sentence, CATEGORIES
 
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
@@ -35,6 +35,12 @@ app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 def serve_index():
     """Serve the frontend index page at the root URL."""
     return FileResponse(FRONTEND_DIR / "index.html")
+
+
+@app.get("/admin")
+def serve_admin():
+    """Serve the admin dashboard page."""
+    return FileResponse(FRONTEND_DIR / "admin.html")
 
 
 @app.on_event("startup")
@@ -64,6 +70,59 @@ def favicon():
     return Response(content=svg, media_type="image/svg+xml")
 
 
+ADMIN_UIDS: set[str] = set()  # Add admin Firebase UIDs here, e.g. {"uid1", "uid2"}
+
+
+@app.get("/admin-data")
+def admin_data(authorization: str = Header(default="")):
+    """Return admin dashboard data — active rooms, leaderboard, race count."""
+    user = _verify_auth(authorization)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+    if ADMIN_UIDS and user["uid"] not in ADMIN_UIDS:
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
+
+    result: dict = {"rooms": [], "leaderboard": [], "total_races": 0}
+
+    # Active RTDB rooms
+    if _rtdb_ready():
+        from firebase_admin import db as rtdb
+        rooms = rtdb.reference("/rooms").get() or {}
+        result["rooms"] = [
+            {
+                "code":       code,
+                "status":     r.get("status"),
+                "players":    len(r.get("players") or {}),
+                "createdAt":  r.get("createdAt", 0),
+            }
+            for code, r in rooms.items() if isinstance(r, dict)
+        ]
+
+    # Firestore leaderboard + race count
+    app_fb = _get_firebase_app_safe()
+    if app_fb:
+        from firebase_admin import firestore
+        db_fs = firestore.client(app=app_fb)
+        lb = db_fs.collection("leaderboard").order_by("wpm", direction="DESCENDING").limit(20).get()
+        result["leaderboard"] = [{"name": d.get("displayName"), "wpm": d.get("wpm"), "uid": d.id} for d in [x.to_dict() for x in lb]]
+        result["total_races"] = db_fs.collection("stats").count().get()[0][0].value
+
+    return result
+
+
+def _rtdb_ready() -> bool:
+    from backend.firebase_admin_init import get_firebase_app
+    return get_firebase_app() is not None
+
+
+def _get_firebase_app_safe():
+    try:
+        from backend.firebase_admin_init import get_firebase_app
+        return get_firebase_app()
+    except Exception:
+        return None
+
+
 @app.get("/health")
 def health_check():
     """Simple health-check endpoint."""
@@ -71,22 +130,51 @@ def health_check():
 
 
 @app.get("/get-sentence")
-def get_sentence():
-    """Return a single random Banglish sentence (legacy endpoint)."""
+def get_sentence(category: str = Query(default="general")):
+    """Return a single random Banglish sentence."""
     try:
-        return {"sentence": get_random_sentence()}
+        return {"sentence": get_random_sentence(category)}
     except Exception:
         return JSONResponse(status_code=500, content={"error": "Sentence file not found"})
 
 
 @app.get("/get-sentences")
-def get_sentences(count: int = Query(default=1, ge=1, le=5)):
+def get_sentences(count: int = Query(default=1, ge=1, le=5), category: str = Query(default="general")):
     """Return `count` unique random sentences joined as one race target."""
     try:
-        sentences = get_random_sentences(count)
-        return {"sentence": " ".join(sentences), "sentences": sentences, "count": count}
+        sentences = get_random_sentences(count, category)
+        return {"sentence": " ".join(sentences), "sentences": sentences, "count": count, "category": category}
     except Exception:
         return JSONResponse(status_code=500, content={"error": "Sentence file not found"})
+
+
+@app.get("/categories")
+def list_categories():
+    """Return the list of available sentence categories."""
+    return {"categories": list(CATEGORIES.keys())}
+
+
+class AddSentenceBody(BaseModel):
+    sentence: str
+    category: str = "general"
+
+
+@app.post("/add-sentence")
+def add_sentence_endpoint(body: AddSentenceBody, authorization: str = Header(default="")):
+    """Append a new sentence to a category file (auth required)."""
+    user = _verify_auth(authorization)
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+    sentence = body.sentence.strip()
+    if not sentence or len(sentence) < 5:
+        return JSONResponse(status_code=400, content={"error": "Sentence too short"})
+    if len(sentence) > 300:
+        return JSONResponse(status_code=400, content={"error": "Sentence too long (max 300 chars)"})
+    try:
+        append_sentence(sentence, body.category)
+        return {"ok": True, "sentence": sentence, "category": body.category}
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
 # ---------------------------------------------------------------------------
@@ -173,15 +261,16 @@ def save_result(
 # Phase 2B – Multiplayer rooms
 # ---------------------------------------------------------------------------
 
-def _rtdb_ready() -> bool:
-    from backend.firebase_admin_init import get_firebase_app
-    return get_firebase_app() is not None
+class CreateRoomBody(BaseModel):
+    custom_sentence: str = ""
 
 
 @app.post("/create-room")
 def create_room_endpoint(
+    body: CreateRoomBody = CreateRoomBody(),
     authorization: str = Header(default=""),
     count: int = Query(default=1, ge=1, le=5),
+    category: str = Query(default="general"),
 ):
     """Create a multiplayer room and return its code + sentence."""
     user = _verify_auth(authorization)
@@ -191,9 +280,11 @@ def create_room_endpoint(
         return JSONResponse(status_code=503, content={"error": "Firebase not configured"})
 
     from backend.room_manager import create_room
-    sentence = " ".join(get_random_sentences(count))
+    sentence = body.custom_sentence.strip() if body.custom_sentence.strip() else \
+               " ".join(get_random_sentences(count, category))
     try:
-        code = create_room(user["uid"], user.get("name", "Anonymous"), sentence)
+        code = create_room(user["uid"], user.get("name", "Anonymous"), sentence,
+                           photo_url=user.get("picture", ""))
         return {"code": code, "sentence": sentence}
     except Exception as exc:
         return JSONResponse(status_code=500, content={"error": str(exc)})
@@ -215,7 +306,8 @@ def join_room_endpoint(code: str, authorization: str = Header(default="")):
     if room.get("status") not in ("waiting",):
         return JSONResponse(status_code=409, content={"error": "Race already started"})
 
-    join_room(code.upper(), user["uid"], user.get("name", "Anonymous"))
+    join_room(code.upper(), user["uid"], user.get("name", "Anonymous"),
+              photo_url=user.get("picture", ""))
     return {"sentence": room["sentence"], "hostUid": room["hostUid"]}
 
 
