@@ -1,0 +1,19 @@
+{
+  "hosting": {
+    "public": "frontend",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "taklatype",
+          "region": "us-central1"
+        }
+      }
+    ]
+  }
+}

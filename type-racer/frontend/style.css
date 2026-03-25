@@ -259,8 +259,76 @@ body {
 .lb-wpm   { color: var(--correct); font-weight: 700; }
 .lb-empty { color: var(--muted); font-size: 0.82rem; padding: 0.5rem 0; text-align: center; list-style: none; }
 
-.logo { font-size: 2.2rem; font-weight: 700; letter-spacing: 2px; color: var(--text); }
-.logo-dot { color: var(--accent); }
+.logo {
+  font-size:    2.2rem;
+  font-weight:  700;
+  color:        var(--text);
+  display:      inline-flex;
+  align-items:  baseline;
+  gap:          0.02em;
+}
+
+/*
+ * Logo animation — a glint of light sweeps left→right across the text (4s cycle).
+ * The dot is positioned right after the text; as the glint exits, the dot
+ * Key-press animation: the logo taps down like a physical keyboard key,
+ * then bounces back — synced with the dot which blinks on the "press".
+ */
+
+.logo-text {
+  display:        inline-block;
+  letter-spacing: 2px;
+  color:          var(--text);
+  animation: logo-keypress 3s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+@keyframes logo-keypress {
+  0%, 100%  { transform: translateY(0)   scaleY(1);    color: var(--text); }
+  /* key press down */
+  8%        { transform: translateY(3px) scaleY(0.96); color: var(--accent); }
+  /* bounce back up */
+  16%       { transform: translateY(-1px) scaleY(1.01); color: var(--text); }
+  20%, 80%  { transform: translateY(0)   scaleY(1);    color: var(--text); }
+}
+
+/* ── Dot base — replaces the conn-dot circle with a styled text character ── */
+.logo-dot {
+  display:       inline-block;
+  width:         auto;
+  height:        auto;
+  border-radius: 0;
+  background:    transparent !important;
+  box-shadow:    none !important;
+  font-size:     inherit;
+  line-height:   1;
+  color:         var(--accent);
+  animation:     logo-dot-idle 3s ease-in-out infinite !important;
+}
+@keyframes logo-dot-idle {
+  0%, 100% { color: var(--accent); opacity: 1; }
+  8%       { color: color-mix(in srgb, white 60%, var(--accent)); opacity: 0.6; }
+  16%      { color: var(--accent); opacity: 1; }
+}
+
+/* Connected: green */
+.logo-dot.connected {
+  animation: logo-dot-connected 3s ease-in-out infinite !important;
+}
+@keyframes logo-dot-connected {
+  0%, 100% { color: var(--correct); opacity: 1; }
+  8%       { color: color-mix(in srgb, white 60%, var(--correct)); opacity: 0.6; }
+  16%      { color: var(--correct); opacity: 1; }
+}
+
+/* Disconnected: fast red blink */
+.logo-dot.disconnected {
+  color:     var(--wrong) !important;
+  animation: logo-dot-error 0.65s ease-in-out infinite !important;
+}
+@keyframes logo-dot-error {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
 .subtitle { font-size: 0.72rem; color: var(--muted); letter-spacing: 1px; margin-top: 0.25rem; text-transform: uppercase; }
 
 /* ---------- Settings Menu ---------- */
@@ -740,7 +808,16 @@ body {
 .hk-key.heat-4 { background: var(--wrong); color: #fff; border-color: var(--wrong); }
 
 /* ---------- Multiplayer Custom Sentence ---------- */
-.mp-custom-row { display: flex; flex-direction: column; gap: 0.4rem; }
+.mp-section-box {
+  background:    var(--surface2);
+  border:        1px solid var(--border);
+  border-radius: 10px;
+  padding:       0.8rem 1rem;
+  display:       flex;
+  flex-direction: column;
+  gap:           0.65rem;
+}
+.mp-custom-row { gap: 0.5rem; }
 .mp-custom-toggle-row {
   display:     flex;
   align-items: center;
@@ -837,6 +914,11 @@ body {
 }
 .mp-overlay.show { opacity: 1; pointer-events: all; }
 
+#mp-lobby-view, #mp-room-view {
+  display:        flex;
+  flex-direction: column;
+  gap:            0.75rem;
+}
 .mp-modal {
   background:     var(--surface);
   border:         1px solid var(--border);
@@ -1348,15 +1430,28 @@ body {
 /* ---------- Connection Dot ---------- */
 .conn-dot {
   display:       inline-block;
-  width:         7px;
-  height:        7px;
+  width:         8px;
+  height:        8px;
   border-radius: 50%;
   background:    var(--muted);
   align-self:    center;
+  position:      relative;
   transition:    background 0.4s;
 }
-.conn-dot.connected    { background: var(--correct); }
-.conn-dot.disconnected { background: var(--wrong); animation: cd-pulse 1s ease infinite; }
+.conn-dot.connected {
+  background: var(--correct);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--correct) 50%, transparent);
+  animation: conn-ping 2s ease-out infinite;
+}
+.conn-dot.disconnected {
+  background: var(--wrong);
+  animation: cd-pulse 0.8s ease infinite;
+}
+@keyframes conn-ping {
+  0%   { box-shadow: 0 0 0 0   color-mix(in srgb, var(--correct) 55%, transparent); }
+  60%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--correct) 0%,  transparent); }
+  100% { box-shadow: 0 0 0 0   color-mix(in srgb, var(--correct) 0%,  transparent); }
+}
 
 /* ---------- Auth Modal ---------- */
 .auth-overlay {

@@ -75,13 +75,15 @@ async function _initMultiplayer() {
   let _selectedCategory = 'general';
 
   // ── Custom sentence toggle ───────────────────────────────────────────────────
+  const mpLobbySelectors = document.getElementById('mp-lobby-selectors');
   let _useCustomSentence = false;
   if (mpCustomToggle) {
     mpCustomToggle.addEventListener('click', () => {
       _useCustomSentence = !_useCustomSentence;
       mpCustomToggle.classList.toggle('active', _useCustomSentence);
-      if (mpCustomInput)   mpCustomInput.style.display   = _useCustomSentence ? '' : 'none';
-      if (mpCustomSaveRow) mpCustomSaveRow.style.display = _useCustomSentence ? '' : 'none';
+      if (mpCustomInput)     mpCustomInput.style.display     = _useCustomSentence ? '' : 'none';
+      if (mpCustomSaveRow)   mpCustomSaveRow.style.display   = _useCustomSentence ? '' : 'none';
+      if (mpLobbySelectors)  mpLobbySelectors.style.display  = _useCustomSentence ? 'none' : '';
     });
   }
 
@@ -142,12 +144,14 @@ async function _initMultiplayer() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body:    JSON.stringify({ custom_sentence: customText }),
       });
-      // Optionally save custom sentence to the pool
+      // Submit custom sentence for admin review
       if (customText && mpCustomSaveCb?.checked) {
         fetch(`${API_BASE}/add-sentence`, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body:    JSON.stringify({ sentence: customText, category: _selectedCategory }),
+        }).then(() => {
+          showToast('Sentence submitted for review — an admin will approve it.', 'info', 4000);
         }).catch(() => {});
       }
       const data = await resp.json();
@@ -364,7 +368,8 @@ async function _initMultiplayer() {
       const secs = remaining % 60;
       if (mpRaceTimer) {
         mpRaceTimer.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
-        mpRaceTimer.classList.toggle('mp-race-timer-low', remaining <= 20);
+        mpRaceTimer.classList.toggle('mp-race-timer-low',    remaining <= 20);
+        mpRaceTimer.classList.toggle('mp-race-timer-urgent', remaining <= 10);
       }
 
       if (remaining === 0) {
@@ -558,9 +563,17 @@ async function _initMultiplayer() {
     if (_raceTimerHandle) { clearInterval(_raceTimerHandle); _raceTimerHandle = null; }
     if (window.__tt) window.__tt.setMultiplayer(false);
     if (mpFinishedNotice) mpFinishedNotice.style.display = 'none';
-    if (mpRaceTimer) mpRaceTimer.textContent = '—';
+    if (mpRaceTimer) {
+      mpRaceTimer.textContent = '—';
+      mpRaceTimer.classList.remove('mp-race-timer-low', 'mp-race-timer-urgent');
+    }
     racePanel.style.display = 'none';
     mpResultPanel.classList.remove('show');
+    // Restore solo controls
+    const lineSel  = document.querySelector('.line-selector');
+    const controls = document.querySelector('.controls');
+    if (lineSel)  lineSel.style.display  = '';
+    if (controls) controls.style.display = '';
     _showView('lobby');
   }
 

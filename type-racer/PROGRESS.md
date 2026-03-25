@@ -4,7 +4,6 @@
 > **Project:** Banglish Office Type Racer
 > **Firebase Project ID:** `taklatype`
 > **Firebase RTDB URL:** `https://taklatype-default-rtdb.firebaseio.com`
-claude --resume 2a8b931b-93ef-4473-92e8-1645a02db831
 ---
 
 ## Table of Contents

@@ -186,7 +186,7 @@ document.getElementById('particle-next').addEventListener('click', () => {
 });
 
 // ─── Line Count Selector ──────────────────────────────────────────────────────
-document.querySelectorAll('.pill').forEach(btn => {
+document.querySelectorAll('.pill[data-count]').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.pill[data-count]').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');

@@ -12,6 +12,12 @@ firebase-service-account.json
 *-service-account.json
 *.key.json
 
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
 # IDE
 .vscode/
 .idea/

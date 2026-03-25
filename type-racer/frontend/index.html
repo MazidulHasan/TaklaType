@@ -23,15 +23,12 @@
     <header class="header">
       <div class="header-top">
         <div>
-          <h1 class="logo">TaklaType<span class="logo-dot">.</span></h1>
+          <h1 class="logo"><span class="logo-text">TaklaType</span><span class="logo-dot conn-dot" id="conn-dot" title="Connecting…">.</span></h1>
           <p class="subtitle">Banglish Office Type Racer</p>
         </div>
 
         <!-- Header action buttons -->
         <div class="header-actions">
-          <!-- Firebase connection status dot -->
-          <span class="conn-dot" id="conn-dot" title="Connecting…"></span>
-
           <!-- Multiplayer button -->
           <button class="header-icon-btn" id="mp-btn" title="Multiplayer">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -290,31 +287,32 @@
         <h2 class="auth-title">Multiplayer</h2>
         <p class="auth-subtitle">Race against your friends in real time</p>
 
-        <!-- Lines selector -->
-        <div class="mp-lines-row">
-          <span class="mp-lines-label">Lines</span>
-          <div class="mp-lines-pills">
-            <button class="mp-line-pill active" data-mpcount="1">1</button>
-            <button class="mp-line-pill" data-mpcount="2">2</button>
-            <button class="mp-line-pill" data-mpcount="3">3</button>
-            <button class="mp-line-pill" data-mpcount="4">4</button>
-            <button class="mp-line-pill" data-mpcount="5">5</button>
+        <!-- Lines + Category selectors -->
+        <div class="mp-section-box" id="mp-lobby-selectors">
+          <div class="mp-lines-row">
+            <span class="mp-lines-label">Lines</span>
+            <div class="mp-lines-pills">
+              <button class="mp-line-pill active" data-mpcount="1">1</button>
+              <button class="mp-line-pill" data-mpcount="2">2</button>
+              <button class="mp-line-pill" data-mpcount="3">3</button>
+              <button class="mp-line-pill" data-mpcount="4">4</button>
+              <button class="mp-line-pill" data-mpcount="5">5</button>
+            </div>
           </div>
-        </div>
-        <!-- Category selector -->
-        <div class="mp-lines-row">
-          <span class="mp-lines-label">Category</span>
-          <div class="mp-lines-pills" id="mp-cat-pills">
-            <button class="mp-line-pill active" data-mpcat="general">General</button>
-            <button class="mp-line-pill" data-mpcat="office">Office</button>
-            <button class="mp-line-pill" data-mpcat="food">Food</button>
-            <button class="mp-line-pill" data-mpcat="motivation">Motivation</button>
-            <button class="mp-line-pill" data-mpcat="love">Love</button>
+          <div class="mp-lines-row">
+            <span class="mp-lines-label">Category</span>
+            <div class="mp-lines-pills" id="mp-cat-pills">
+              <button class="mp-line-pill active" data-mpcat="general">General</button>
+              <button class="mp-line-pill" data-mpcat="office">Office</button>
+              <button class="mp-line-pill" data-mpcat="food">Food</button>
+              <button class="mp-line-pill" data-mpcat="motivation">Motivation</button>
+              <button class="mp-line-pill" data-mpcat="love">Love</button>
+            </div>
           </div>
         </div>
 
         <!-- Optional custom sentence -->
-        <div class="mp-custom-row">
+        <div class="mp-section-box mp-custom-row">
           <label class="mp-custom-toggle-row">
             <span class="mp-lines-label">Custom sentence</span>
             <span class="toggle-switch" id="mp-custom-toggle"><span class="toggle-knob"></span></span>

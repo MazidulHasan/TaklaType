@@ -1,49 +1,44 @@
 """
 sentence_loader.py
-Loads sentences from data files at startup and returns random ones.
+Loads sentences from data/sentences.json.
 Supports categories: general, office, food, motivation, love.
+User-submitted sentences go into "pending" and require admin approval.
 """
 
+import json
 import random
 from pathlib import Path
 
-_DATA_DIR = Path(__file__).parent.parent / "data"
+_DATA_FILE = Path(__file__).parent.parent / "data" / "sentences.json"
 
-# Category → filename mapping ("all" merges every category)
-CATEGORIES: dict[str, str] = {
-    "general":    "sentences.txt",
-    "office":     "sentences_office.txt",
-    "food":       "sentences_food.txt",
-    "motivation": "sentences_motivation.txt",
-    "love":       "sentences_love.txt",
-}
+CATEGORIES = ["general", "office", "food", "motivation", "love"]
 
-_pool: dict[str, list[str]] = {}   # category → sentences
+_data: dict[str, list] = {}   # live in-memory store (mirrors the JSON file)
 
 
-def _load_file(path: Path) -> list[str]:
-    if not path.exists():
-        return []
-    with open(path, encoding="utf-8") as f:
-        return [line.strip() for line in f if line.strip()]
+def _read_json() -> dict:
+    with open(_DATA_FILE, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _write_json(data: dict) -> None:
+    with open(_DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def load_sentences() -> None:
-    """Read and cache all sentence files."""
-    global _pool
-    for cat, fname in CATEGORIES.items():
-        _pool[cat] = _load_file(_DATA_DIR / fname)
-    # "all" merges everything
-    _pool["all"] = []
-    for lines in _pool.values():
-        _pool["all"].extend(lines)
-    if not _pool["general"]:
-        raise FileNotFoundError(f"Sentence file not found: {_DATA_DIR / CATEGORIES['general']}")
+    """Read and cache all sentences from the JSON file."""
+    global _data
+    _data = _read_json()
+    if not _data.get("general"):
+        raise FileNotFoundError(f"sentences.json not found or 'general' key is empty: {_DATA_FILE}")
+    # Ensure pending key exists
+    _data.setdefault("pending", [])
 
 
 def _get_pool(category: str) -> list[str]:
-    cat = category.lower() if category else "general"
-    pool = _pool.get(cat) or _pool.get("general", [])
+    cat  = category.lower() if category else "general"
+    pool = _data.get(cat) or _data.get("general", [])
     if not pool:
         raise RuntimeError("Sentences not loaded yet.")
     return pool
@@ -59,14 +54,48 @@ def get_random_sentences(count: int, category: str = "general") -> list[str]:
     return random.sample(pool, count)
 
 
-def append_sentence(sentence: str, category: str = "general") -> None:
-    """Append a new sentence to a category file and refresh the in-memory pool."""
-    fname = CATEGORIES.get(category.lower(), CATEGORIES["general"])
-    path  = _DATA_DIR / fname
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(sentence.strip() + "\n")
-    # Refresh pool
-    _pool[category.lower()] = _load_file(path)
-    _pool["all"] = []
-    for lines in _pool.values():
-        _pool["all"].extend(lines)
+def add_to_pending(sentence: str, category: str = "general", submitted_by: str = "") -> None:
+    """Add a user-submitted sentence to the pending queue (awaits admin approval)."""
+    entry = {"text": sentence.strip(), "category": category.lower(), "submitted_by": submitted_by}
+    raw = _read_json()
+    raw.setdefault("pending", [])
+    raw["pending"].append(entry)
+    _write_json(raw)
+    _data["pending"] = raw["pending"]
+
+
+def get_pending() -> list[dict]:
+    return list(_data.get("pending", []))
+
+
+def approve_sentence(index: int) -> dict:
+    """Move a pending sentence into its category pool."""
+    raw = _read_json()
+    pending = raw.get("pending", [])
+    if index < 0 or index >= len(pending):
+        raise IndexError("Invalid pending index")
+    entry = pending.pop(index)
+    cat   = entry.get("category", "general")
+    if cat not in CATEGORIES:
+        cat = "general"
+    raw.setdefault(cat, [])
+    raw[cat].append(entry["text"])
+    raw["pending"] = pending
+    _write_json(raw)
+    # Refresh in-memory pool
+    _data[cat]        = raw[cat]
+    _data["pending"]  = pending
+    return entry
+
+
+def reject_sentence(index: int) -> dict:
+    """Remove a pending sentence without approving it."""
+    raw = _read_json()
+    pending = raw.get("pending", [])
+    if index < 0 or index >= len(pending):
+        raise IndexError("Invalid pending index")
+    entry = pending.pop(index)
+    raw["pending"] = pending
+    _write_json(raw)
+    _data["pending"] = pending
+    return entry

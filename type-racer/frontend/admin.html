@@ -6,65 +6,126 @@
   <title>TaklaType Admin</title>
   <link rel="stylesheet" href="/static/style.css" />
   <style>
-    body { padding: 2rem; }
-    .admin-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; }
-    .admin-title  { font-size: 1.4rem; font-weight: 700; color: var(--accent); font-family: 'Courier New', monospace; }
-    .admin-grid   { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
-    .admin-card   { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem 1.5rem; }
-    .admin-card-title { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 0.8rem; }
-    .admin-stat   { font-size: 2.5rem; font-weight: 700; color: var(--accent); font-family: 'Courier New', monospace; }
-    .admin-table  { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-    .admin-table th { color: var(--muted); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; padding: 0.3rem 0; text-align: left; border-bottom: 1px solid var(--border); }
-    .admin-table td { padding: 0.4rem 0.3rem; color: var(--text); border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
-    .badge-racing  { background: color-mix(in srgb, var(--correct) 20%, transparent); color: var(--correct); border: 1px solid var(--correct); border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.65rem; font-weight: 700; }
-    .badge-waiting { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.65rem; font-weight: 700; }
-    .badge-finished{ background: var(--surface2); color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.65rem; }
-    #admin-error   { color: var(--wrong); margin-top: 2rem; font-size: 0.9rem; text-align: center; }
-    #admin-loading { color: var(--muted); margin-top: 2rem; font-size: 0.9rem; text-align: center; }
-    .btn-refresh   { background: transparent; border: 1.5px solid var(--border); border-radius: 8px; color: var(--muted); font-family: 'Courier New', monospace; font-size: 0.78rem; padding: 0.35rem 0.9rem; cursor: pointer; margin-left: auto; transition: border-color 0.15s, color 0.15s; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { padding: 1.5rem 2rem; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; }
+
+    /* ── Header ── */
+    .admin-header {
+      display: flex; align-items: center; gap: 1rem;
+      width: 100%; margin-bottom: 2rem; padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .admin-title { font-size: 1.3rem; font-weight: 700; color: var(--accent); font-family: 'Courier New', monospace; }
+    .admin-user  { font-size: 0.75rem; color: var(--muted); margin-left: auto; font-family: 'Courier New', monospace; }
+    .btn-refresh { background: transparent; border: 1.5px solid var(--border); border-radius: 8px; color: var(--muted); font-family: 'Courier New', monospace; font-size: 0.78rem; padding: 0.35rem 0.9rem; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
     .btn-refresh:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Stat row ── */
+    .admin-stats-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .admin-stat-card {
+      flex: 1; min-width: 140px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 1rem 1.3rem;
+    }
+    .admin-stat-label { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 0.4rem; }
+    .admin-stat-value { font-size: 2.2rem; font-weight: 700; color: var(--accent); font-family: 'Courier New', monospace; line-height: 1; }
+
+    /* ── Section cards ── */
+    .admin-section {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 1.2rem 1.5rem; margin-bottom: 1.2rem;
+    }
+    .admin-section-title {
+      font-size: 0.62rem; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 1.2px; margin-bottom: 1rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+
+    /* ── Tables ── */
+    .admin-table  { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .admin-table th { color: var(--muted); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; padding: 0 0 0.5rem; text-align: left; border-bottom: 1px solid var(--border); }
+    .admin-table td { padding: 0.5rem 0.3rem; color: var(--text); border-bottom: 1px solid color-mix(in srgb, var(--border) 35%, transparent); vertical-align: middle; }
+    .admin-table tr:last-child td { border-bottom: none; }
+    .admin-table .muted { color: var(--muted); font-size: 0.75rem; }
+
+    /* ── Badges ── */
+    .badge { border-radius: 4px; padding: 0.1rem 0.45rem; font-size: 0.62rem; font-weight: 700; white-space: nowrap; }
+    .badge-racing   { background: color-mix(in srgb, var(--correct) 20%, transparent); color: var(--correct); border: 1px solid var(--correct); }
+    .badge-waiting  { background: color-mix(in srgb, var(--accent) 20%, transparent);  color: var(--accent);  border: 1px solid var(--accent); }
+    .badge-finished { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+
+    /* ── Pending ── */
+    .pending-badge { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); border: 1px solid var(--accent); border-radius: 10px; font-size: 0.62rem; font-weight: 700; padding: 0.1rem 0.5rem; }
+    .btn-approve { background: color-mix(in srgb, var(--correct) 12%, transparent); border: 1px solid var(--correct); border-radius: 5px; color: var(--correct); font-size: 0.7rem; padding: 0.2rem 0.6rem; cursor: pointer; font-family: 'Courier New', monospace; transition: background 0.15s; white-space: nowrap; }
+    .btn-approve:hover { background: color-mix(in srgb, var(--correct) 25%, transparent); }
+    .btn-reject  { background: color-mix(in srgb, var(--wrong) 12%, transparent); border: 1px solid var(--wrong); border-radius: 5px; color: var(--wrong); font-size: 0.7rem; padding: 0.2rem 0.6rem; cursor: pointer; font-family: 'Courier New', monospace; transition: background 0.15s; white-space: nowrap; }
+    .btn-reject:hover  { background: color-mix(in srgb, var(--wrong) 25%, transparent); }
+    .action-cell { display: flex; gap: 0.4rem; align-items: center; }
+    .btn-delete-room { background: color-mix(in srgb, var(--wrong) 10%, transparent); border: 1px solid color-mix(in srgb, var(--wrong) 40%, transparent); border-radius: 5px; color: var(--wrong); font-size: 0.7rem; padding: 0.2rem 0.6rem; cursor: pointer; font-family: 'Courier New', monospace; transition: background 0.15s; white-space: nowrap; }
+    .btn-delete-room:hover { background: color-mix(in srgb, var(--wrong) 22%, transparent); border-color: var(--wrong); }
+    .player-list { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .player-tag { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--muted); }
+    .player-active-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--correct); display: inline-block; box-shadow: 0 0 0 0 color-mix(in srgb, var(--correct) 60%, transparent); animation: player-ping 1.4s ease infinite; }
+    .player-done-dot   { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); display: inline-block; }
+    @keyframes player-ping {
+      0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--correct) 60%, transparent); }
+      70%  { box-shadow: 0 0 0 5px transparent; }
+      100% { box-shadow: 0 0 0 0 transparent; }
+    }
+
+    /* ── State messages ── */
+    #admin-error   { color: var(--wrong); margin-top: 2rem; font-size: 0.88rem; text-align: center; }
+    #admin-loading { color: var(--muted); margin-top: 4rem; font-size: 0.88rem; text-align: center; }
   </style>
 </head>
 <body>
 
 <div class="admin-header">
   <span class="admin-title">TaklaType Admin</span>
+  <span class="admin-user" id="admin-user-email"></span>
   <button class="btn-refresh" id="btn-refresh">↺ Refresh</button>
 </div>
 
 <div id="admin-loading">Signing in…</div>
-<div id="admin-error"  style="display:none"></div>
+<div id="admin-error" style="display:none"></div>
 
 <div id="admin-content" style="display:none">
-  <div class="admin-grid">
 
-    <div class="admin-card">
-      <p class="admin-card-title">Total Races Played</p>
-      <div class="admin-stat" id="stat-total">—</div>
+  <!-- Stats row -->
+  <div class="admin-stats-row">
+    <div class="admin-stat-card">
+      <p class="admin-stat-label">Total Races</p>
+      <div class="admin-stat-value" id="stat-total">—</div>
     </div>
-
-    <div class="admin-card">
-      <p class="admin-card-title">Active Rooms</p>
-      <div class="admin-stat" id="stat-rooms">—</div>
+    <div class="admin-stat-card">
+      <p class="admin-stat-label">Active Rooms</p>
+      <div class="admin-stat-value" id="stat-rooms">—</div>
     </div>
-
-    <div class="admin-card" style="grid-column: 1 / -1">
-      <p class="admin-card-title">Live Rooms</p>
-      <table class="admin-table">
-        <thead><tr><th>Code</th><th>Status</th><th>Players</th><th>Created</th></tr></thead>
-        <tbody id="rooms-body"><tr><td colspan="4" style="color:var(--muted)">No rooms</td></tr></tbody>
-      </table>
+    <div class="admin-stat-card">
+      <p class="admin-stat-label">Pending Review</p>
+      <div class="admin-stat-value" id="stat-pending">—</div>
     </div>
-
-    <div class="admin-card" style="grid-column: 1 / -1">
-      <p class="admin-card-title">Leaderboard (Top 20)</p>
-      <table class="admin-table">
-        <thead><tr><th>#</th><th>Name</th><th>WPM</th><th>UID</th></tr></thead>
-        <tbody id="lb-body"><tr><td colspan="4" style="color:var(--muted)">No data</td></tr></tbody>
-      </table>
-    </div>
-
   </div>
+
+  <!-- Live Rooms -->
+  <div class="admin-section">
+    <p class="admin-section-title">Live Rooms</p>
+    <table class="admin-table">
+      <thead><tr><th>Code</th><th>Status</th><th>Players</th><th>Created</th><th>Action</th></tr></thead>
+      <tbody id="rooms-body"><tr><td colspan="5" class="muted">No active rooms</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- Pending Sentences -->
+  <div class="admin-section">
+    <p class="admin-section-title">Pending Sentences <span class="pending-badge" id="pending-count">0</span></p>
+    <table class="admin-table">
+      <thead><tr><th>Sentence</th><th>Category</th><th>Submitted by</th><th>Actions</th></tr></thead>
+      <tbody id="pending-body"><tr><td colspan="4" class="muted">No pending sentences</td></tr></tbody>
+    </table>
+  </div>
+
+
 </div>
 
 <script type="module">
@@ -90,11 +151,14 @@ const auth = getAuth(app);
 const loadingEl  = document.getElementById('admin-loading');
 const errorEl    = document.getElementById('admin-error');
 const contentEl  = document.getElementById('admin-content');
-const statTotal  = document.getElementById('stat-total');
-const statRooms  = document.getElementById('stat-rooms');
-const roomsBody  = document.getElementById('rooms-body');
-const lbBody     = document.getElementById('lb-body');
-const btnRefresh = document.getElementById('btn-refresh');
+const statTotal    = document.getElementById('stat-total');
+const statRooms    = document.getElementById('stat-rooms');
+const statPending  = document.getElementById('stat-pending');
+const roomsBody    = document.getElementById('rooms-body');
+const pendingBody  = document.getElementById('pending-body');
+const pendingCount = document.getElementById('pending-count');
+const btnRefresh   = document.getElementById('btn-refresh');
+const adminEmail   = document.getElementById('admin-user-email');
 
 let _token = null;
 
@@ -104,6 +168,7 @@ onAuthStateChanged(auth, async user => {
     return;
   }
   _token = await user.getIdToken();
+  if (adminEmail) adminEmail.textContent = user.email || '';
   loadData();
 });
 
@@ -126,24 +191,47 @@ async function loadData() {
     }
     const data = await resp.json();
 
-    statTotal.textContent = data.total_races ?? '—';
-    statRooms.textContent = data.rooms.length;
+    statTotal.textContent   = data.total_races ?? '—';
+    statRooms.textContent   = data.rooms.length;
+    statPending.textContent = (data.pending || []).length;
 
     // Rooms table
     roomsBody.innerHTML = data.rooms.length
       ? data.rooms.map(r => {
           const created = r.createdAt ? new Date(r.createdAt).toLocaleTimeString() : '—';
-          const badge   = `<span class="badge-${r.status}">${r.status}</span>`;
-          return `<tr><td><b>${r.code}</b></td><td>${badge}</td><td>${r.players}</td><td>${created}</td></tr>`;
+          const badge   = `<span class="badge badge-${r.status}">${r.status}</span>`;
+          const players = (r.players || []).map(p => {
+            const dot = p.finished
+              ? `<span class="player-done-dot" title="Finished"></span>`
+              : `<span class="player-active-dot" title="Racing"></span>`;
+            return `<span class="player-tag">${dot}${_esc(p.name)}</span>`;
+          }).join('') || '<span class="muted">—</span>';
+          return `<tr>
+            <td><b>${_esc(r.code)}</b></td>
+            <td>${badge}</td>
+            <td><div class="player-list">${players}</div></td>
+            <td class="muted">${created}</td>
+            <td><button class="btn-delete-room" data-action="delete-room" data-code="${_esc(r.code)}">✕ Delete</button></td>
+          </tr>`;
         }).join('')
-      : '<tr><td colspan="4" style="color:var(--muted)">No active rooms</td></tr>';
+      : '<tr><td colspan="5" class="muted">No active rooms</td></tr>';
 
-    // Leaderboard table
-    lbBody.innerHTML = data.leaderboard.length
-      ? data.leaderboard.map((p, i) =>
-          `<tr><td>${i + 1}</td><td>${_esc(p.name || 'Unknown')}</td><td style="color:var(--correct);font-weight:700">${p.wpm}</td><td style="color:var(--muted);font-size:0.72rem">${p.uid}</td></tr>`
+    // Pending sentences table
+    const pending = data.pending || [];
+    pendingCount.textContent = pending.length;
+    pendingBody.innerHTML = pending.length
+      ? pending.map((p, i) =>
+          `<tr id="pending-row-${i}">
+            <td>${_esc(p.text)}</td>
+            <td class="muted">${_esc(p.category)}</td>
+            <td class="muted">${_esc(p.submitted_by || '—')}</td>
+            <td><div class="action-cell">
+              <button class="btn-approve" data-idx="${i}" data-action="approve">✓ Approve</button>
+              <button class="btn-reject"  data-idx="${i}" data-action="reject">✕ Reject</button>
+            </div></td>
+          </tr>`
         ).join('')
-      : '<tr><td colspan="4" style="color:var(--muted)">No leaderboard data</td></tr>';
+      : '<tr><td colspan="4" class="muted">No pending sentences</td></tr>';
 
     loadingEl.style.display = 'none';
     contentEl.style.display = '';
@@ -157,6 +245,51 @@ async function loadData() {
 function _esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+// Event delegation — handles approve/reject sentences AND delete room
+document.addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn || !_token) return;
+  const action = btn.dataset.action;
+
+  // ── Delete room ────────────────────────────────────────────────────────────
+  if (action === 'delete-room') {
+    const code = btn.dataset.code;
+    if (!confirm(`Delete room ${code}? This will kick all players.`)) return;
+    btn.disabled = true;
+    try {
+      const resp = await fetch(`${API_BASE}/admin/delete-room/${code}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${_token}` },
+      });
+      if (!resp.ok) { const d = await resp.json(); alert(`Error: ${d.error}`); btn.disabled = false; return; }
+      loadData();
+    } catch (err) { alert(`Error: ${err.message}`); btn.disabled = false; }
+    return;
+  }
+
+  // ── Approve / reject sentence ──────────────────────────────────────────────
+  const index    = parseInt(btn.dataset.idx, 10);
+  const method   = action === 'approve' ? 'POST' : 'DELETE';
+  const endpoint = action === 'approve' ? 'approve-sentence' : 'reject-sentence';
+  const row = document.getElementById(`pending-row-${index}`);
+  if (row) row.style.opacity = '0.4';
+  btn.disabled = true;
+  try {
+    const resp = await fetch(`${API_BASE}/${endpoint}/${index}`, {
+      method, headers: { Authorization: `Bearer ${_token}` },
+    });
+    if (!resp.ok) {
+      const d = await resp.json();
+      alert(`Error: ${d.error}`);
+      if (row) { row.style.opacity = ''; btn.disabled = false; }
+      return;
+    }
+    loadData();
+  } catch (err) {
+    alert(`Error: ${err.message}`);
+    if (row) { row.style.opacity = ''; btn.disabled = false; }
+  }
+});
 </script>
 </body>
 </html>
