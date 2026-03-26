@@ -28,6 +28,8 @@ Race your friends by typing Banglish sentences (Bangla words written in English 
 - Play Again with host-controlled rematch settings (lines + category)
 - "Wants to play again" icon on the result screen per player
 - URL-based join with sign-in prompt for unauthenticated users
+- Host closes room → all players are automatically kicked with a message
+- Custom Race button on homepage — jump straight to a custom-sentence multiplayer room
 
 ### Auth & Stats
 - Google Sign-In and Email/Password via Firebase Auth
@@ -40,6 +42,7 @@ Race your friends by typing Banglish sentences (Bangla words written in English 
 - 3 font sizes, sound toggle, timer toggle, particles toggle
 - Typewriter logo animation on page load
 - Mobile-friendly layout
+- Resizable typing area — drag the handle below the text box to adjust height
 - All settings persisted in `localStorage`
 
 ---
@@ -135,13 +138,13 @@ type-racer/
 
 All sentences are **Banglish** — Bangla language written in English phonetic spelling. Categories are inspired by:
 
-| Category | Inspiration |
+| Category | Vibe |
 |---|---|
-| General | Humayun Ahmed novels — Himu & Misir Ali dialogue |
-| Office | Workplace Bangladeshi Bangla |
-| Food | Bangladeshi food culture |
-| Motivation | Tagore, Nazrul, Jibanananda Das — translated to Banglish |
-| Love | Romantic Bangla poetry — Banglish adaptation |
+| General | Everyday Bangladeshi life — traffic, internet, rickshaw logic |
+| Office | Dev team problems, stand-ups, deployment disasters |
+| Food | Biryani debates, fuchka loyalty, cha dependence |
+| Motivation | Relatable procrastination wisdom and gentle roasts |
+| Love | Romantic chaos with a Dhaka-realism twist |
 
 ---
 

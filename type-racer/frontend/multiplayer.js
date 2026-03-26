@@ -14,6 +14,8 @@ const API_BASE = (location.hostname === '127.0.0.1' || location.hostname === 'lo
 if (!isConfigured) {
   const btn = document.getElementById('mp-btn');
   if (btn) btn.style.display = 'none';
+  const btnCR = document.getElementById('btn-custom-race');
+  if (btnCR) btnCR.style.display = 'none';
 } else {
   _initMultiplayer();
 }
@@ -86,9 +88,12 @@ async function _initMultiplayer() {
   const mpCustomSaveRow    = document.getElementById('mp-custom-save-row');
   const mpCustomSaveCb     = document.getElementById('mp-custom-save-cb');
 
+  const btnCustomRace = document.getElementById('btn-custom-race');
+
   // ── State ───────────────────────────────────────────────────────────────────
-  let _waitingForReset  = false;
-  let roomCode          = null;
+  let _waitingForReset     = false;
+  let _currentWantsRematch = {};
+  let roomCode             = null;
   let roomSentence      = null;
   let isHost            = false;
   let roomRef           = null;
@@ -237,12 +242,14 @@ async function _initMultiplayer() {
     _renderWantsRematch({});
   }
 
-  // ── Render "wants to play again" icons on result rows ────────────────────────
+  // ── Render "wants to play again" icons + row highlight on result rows ────────
   function _renderWantsRematch(wantsRematch) {
+    _currentWantsRematch = wantsRematch || {};
     mpResultList.querySelectorAll('[data-uid]').forEach(row => {
-      const icon = row.querySelector('.mp-result-rematch-icon');
-      if (!icon) return;
-      icon.style.visibility = (wantsRematch || {})[row.dataset.uid] ? 'visible' : 'hidden';
+      const wants = !!_currentWantsRematch[row.dataset.uid];
+      const icon  = row.querySelector('.mp-result-rematch-icon');
+      if (icon) icon.style.visibility = wants ? 'visible' : 'hidden';
+      row.classList.toggle('wants-rematch', wants);
     });
   }
 
@@ -274,6 +281,9 @@ async function _initMultiplayer() {
     mpWaitingMsg.style.display = host ? 'none' : '';
     mpReadyBtn.style.display   = host ? 'none' : '';
     _updateReadyBtn();
+    // Label + style the room leave button based on role
+    mpLeaveBtn.textContent = host ? 'Close Room' : 'Leave Room';
+    mpLeaveBtn.classList.toggle('is-host-close', host);
 
     _showView('room');
     mpOverlay.classList.add('show');
@@ -552,6 +562,16 @@ async function _initMultiplayer() {
         <span class="mp-result-rematch-icon" style="visibility:hidden" title="Wants to play again">↺</span>
       </li>`;
     }).join('');
+    // Label the result-actions leave button based on role
+    if (mpResultLeaveBtn) {
+      mpResultLeaveBtn.textContent = isHost ? 'Close Room' : 'Leave Room';
+      mpResultLeaveBtn.classList.toggle('is-host-close', isHost);
+    }
+    // Label the rematch-setup leave button (host-only view)
+    if (mpResultLeaveBtn3) {
+      mpResultLeaveBtn3.textContent = 'Close Room';
+      mpResultLeaveBtn3.classList.add('is-host-close');
+    }
     mpResultPanel.classList.add('show');
   }
 
@@ -628,7 +648,14 @@ async function _initMultiplayer() {
 
   // ── Leave from results screen (all three leave buttons) ─────────────────
   [mpResultLeaveBtn, mpResultLeaveBtn2, mpResultLeaveBtn3].forEach(btn => {
-    if (btn) btn.addEventListener('click', () => {
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      // Warn host if other players have requested a rematch or setup is visible
+      const inRematchSetup = mpRematchSetup && mpRematchSetup.style.display !== 'none';
+      const othersWantPlay = Object.keys(_currentWantsRematch).length > 0;
+      if (isHost && (inRematchSetup || othersWantPlay)) {
+        if (!confirm('Closing the room will kick all other players. Close anyway?')) return;
+      }
       _resetResultPanel();
       mpResultPanel.classList.remove('show');
       _leaveRoom();
@@ -667,7 +694,13 @@ async function _initMultiplayer() {
 
   function _resetState() {
     roomCode = null; roomSentence = null; isHost = false;
-    _raceStarted = false; _selfFinished = false; _isReady = false; _waitingForReset = false;
+    _raceStarted = false; _selfFinished = false; _isReady = false;
+    _waitingForReset = false; _currentWantsRematch = {};
+    // Reset leave button to default "Leave Room" label
+    mpLeaveBtn.textContent = 'Leave Room';
+    mpLeaveBtn.classList.remove('is-host-close');
+    if (mpResultLeaveBtn) { mpResultLeaveBtn.textContent = 'Leave Room'; mpResultLeaveBtn.classList.remove('is-host-close'); }
+    if (mpResultLeaveBtn3) { mpResultLeaveBtn3.textContent = 'Leave Room'; mpResultLeaveBtn3.classList.remove('is-host-close'); }
     _resetResultPanel();
     if (_raceTimerHandle) { clearInterval(_raceTimerHandle); _raceTimerHandle = null; }
     if (window.__tt) window.__tt.setMultiplayer(false);
@@ -702,6 +735,26 @@ async function _initMultiplayer() {
       userPanel.title = online ? 'Connected' : 'Disconnected – reconnecting…';
     }
   });
+
+  // ── Custom Race button (homepage) ───────────────────────────────────────────
+  if (btnCustomRace) {
+    btnCustomRace.addEventListener('click', () => {
+      const user = getCurrentUser();
+      if (!user) { showToast('Sign in to use Custom Race.', 'info'); return; }
+      _showView('lobby');
+      mpOverlay.classList.add('show');
+      mpError.textContent = '';
+      // Activate custom sentence if not already on
+      if (!_useCustomSentence) {
+        _useCustomSentence = true;
+        mpCustomToggle.classList.add('active');
+        if (mpCustomInput)    mpCustomInput.style.display    = '';
+        if (mpCustomSaveRow)  mpCustomSaveRow.style.display  = '';
+        if (mpLobbySelectors) mpLobbySelectors.style.display = 'none';
+      }
+      if (mpCustomInput) mpCustomInput.focus();
+    });
+  }
 
   const urlRoom = new URLSearchParams(location.search).get('room');
   if (urlRoom) {

@@ -112,10 +112,9 @@ def reset_room(code: str, new_sentence: str) -> None:
 
 
 def leave_room(code: str, uid: str) -> None:
+    host_uid = rtdb.reference(f"/rooms/{code}/hostUid").get()
     rtdb.reference(f"/rooms/{code}/players/{uid}").delete()
     players = rtdb.reference(f"/rooms/{code}/players").get()
-    if not players:
+    # If room is empty or host left, close the entire room for everyone
+    if not players or host_uid == uid:
         rtdb.reference(f"/rooms/{code}").delete()
-    elif rtdb.reference(f"/rooms/{code}/hostUid").get() == uid:
-        new_host = next(iter(players))
-        rtdb.reference(f"/rooms/{code}/hostUid").set(new_host)

@@ -646,6 +646,55 @@ export function trapFocus(modalEl) {
   }, TYPE_MS);
 })();
 
+// ─── Resize Handle ────────────────────────────────────────────────────────────
+(function initResizeHandle() {
+  const handle = document.getElementById('sentence-resize-handle');
+  if (!handle) return;
+
+  const STORAGE_KEY = 'tt-sentence-height';
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) sentenceContainer.style.height = saved + 'px';
+
+  let dragging = false;
+  let startY = 0;
+  let startH = 0;
+
+  function onStart(clientY) {
+    dragging = true;
+    startY   = clientY;
+    startH   = sentenceContainer.getBoundingClientRect().height;
+    handle.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor     = 'ns-resize';
+  }
+
+  function onMove(clientY) {
+    if (!dragging) return;
+    const delta   = clientY - startY;
+    const minH    = parseInt(getComputedStyle(sentenceContainer).minHeight) || 80;
+    const maxH    = window.innerHeight * 0.7;
+    const newH    = Math.min(maxH, Math.max(minH, startH + delta));
+    sentenceContainer.style.height = newH + 'px';
+  }
+
+  function onEnd() {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    document.body.style.cursor     = '';
+    localStorage.setItem(STORAGE_KEY, Math.round(sentenceContainer.getBoundingClientRect().height));
+  }
+
+  handle.addEventListener('mousedown',  e => { e.preventDefault(); onStart(e.clientY); });
+  document.addEventListener('mousemove', e => onMove(e.clientY));
+  document.addEventListener('mouseup',   onEnd);
+
+  handle.addEventListener('touchstart',  e => { e.preventDefault(); onStart(e.touches[0].clientY); }, { passive: false });
+  document.addEventListener('touchmove', e => { if (dragging) { e.preventDefault(); onMove(e.touches[0].clientY); } }, { passive: false });
+  document.addEventListener('touchend',  onEnd);
+})();
+
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 loadSettings();
 applySettings();
