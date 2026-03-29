@@ -118,7 +118,7 @@ def admin_data(authorization: str = Header(default="")):
         if app_fb:
             from firebase_admin import firestore
             db_fs = firestore.client(app=app_fb)
-            lb = db_fs.collection("leaderboard").order_by("wpm", direction="DESCENDING").limit(20).get()
+            lb = db_fs.collection("leaderboard").order_by("wpm", direction="DESCENDING").limit(10).get()
             result["leaderboard"] = [
                 {"name": d.get("displayName"), "wpm": d.get("wpm"), "uid": d.id}
                 for d in [x.to_dict() for x in lb]
@@ -402,9 +402,14 @@ def finish_player_endpoint(code: str, result: RaceResult, authorization: str = H
     return {"rank": rank}
 
 
+class ResetRoomBody(BaseModel):
+    custom_sentence: str = ""
+
+
 @app.post("/reset-room/{code}")
 def reset_room_endpoint(
     code: str,
+    body: ResetRoomBody = ResetRoomBody(),
     count: int = 1,
     category: str = "general",
     authorization: str = Header(default=""),
@@ -423,7 +428,8 @@ def reset_room_endpoint(
     if room.get("hostUid") != user["uid"]:
         return JSONResponse(status_code=403, content={"error": "Only the host can reset the room"})
 
-    sentence = " ".join(get_random_sentences(max(1, count), category))
+    sentence = body.custom_sentence.strip() if body.custom_sentence.strip() else \
+               " ".join(get_random_sentences(max(1, count), category))
     reset_room(code.upper(), sentence)
     return {"ok": True, "sentence": sentence}
 

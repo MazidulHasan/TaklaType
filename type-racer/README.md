@@ -61,15 +61,29 @@ Get-Process python* | Stop-Process -Force
 
 ## 2. Environment Variables
 
-Create a `.env` file in `type-racer/` (copy from `.env.example`):
+The `.env` file is **required** for auth, multiplayer, leaderboard, and score saving to work. Without it the backend cannot connect to Firebase and all authenticated endpoints will return `401 Unauthorized`.
+
+```bash
+# From type-racer/
+cp .env.example .env
+```
+
+Then edit `.env` with your actual values:
+
+```env
+FIREBASE_CREDENTIALS_PATH=./firebase-service-account.json
+FIREBASE_DATABASE_URL=https://taklatype-default-rtdb.firebaseio.com
+```
 
 | Variable | Required | Description |
 |---|---|---|
-| `FIREBASE_CREDENTIALS_PATH` | Yes (if using Firebase) | Path to service account JSON file |
-| `FIREBASE_CREDENTIALS_JSON` | Alternative | Full JSON content as a string (used on Render) |
-| `FIREBASE_DATABASE_URL` | Yes (if using Firebase) | `https://YOUR-PROJECT-default-rtdb.firebaseio.com` |
+| `FIREBASE_CREDENTIALS_PATH` | Yes (local dev) | Path to `firebase-service-account.json` — typically `./firebase-service-account.json` |
+| `FIREBASE_CREDENTIALS_JSON` | Yes (cloud deploy) | Full JSON content of the service account as a string (used on Render) |
+| `FIREBASE_DATABASE_URL` | Yes | Realtime Database URL — `https://taklatype-default-rtdb.firebaseio.com` |
 
 > **Note:** `FIREBASE_CREDENTIALS_JSON` takes priority over `FIREBASE_CREDENTIALS_PATH` if both are set. Use the JSON env var for cloud deployments where file paths are unreliable.
+>
+> **Important:** If the `.env` file is missing or has placeholder values, the backend will start but Firebase Admin SDK won't initialize — auth, multiplayer, leaderboard, and score saving will all fail with `401 Unauthorized`. The solo typing game will still work.
 
 ---
 
@@ -82,15 +96,67 @@ Create a `.env` file in `type-racer/` (copy from `.env.example`):
 - **Firestore Database** → Create in production mode
 - **Realtime Database** → Create, note the URL
 
-### Service Account
+### Service Account (`firebase-service-account.json`)
 
-Download from: Firebase Console → Project Settings → Service Accounts → Generate New Private Key
+This file authenticates the backend (FastAPI) with Firebase Admin SDK. It is **gitignored** and must never be committed.
 
-Place as `firebase-service-account.json` in `type-racer/` (it's gitignored).
+**How to get it:**
+1. Go to **Firebase Console** → **Project Settings** → **Service Accounts**
+2. Click **Generate New Private Key** → downloads a JSON file
+3. Rename it to `firebase-service-account.json` and place it in `type-racer/`
 
-### Security Rules
+**What it contains:**
 
-Deploy these from the Firebase Console or Firebase CLI (`firebase deploy --only firestore:rules,database`).
+| Field | Value (for project `taklatype`) |
+|---|---|
+| `type` | `service_account` |
+| `project_id` | `taklatype` |
+| `client_email` | `firebase-adminsdk-fbsvc@taklatype.iam.gserviceaccount.com` |
+| `client_id` | `101666753397617564112` |
+| `auth_uri` | `https://accounts.google.com/o/oauth2/auth` |
+| `token_uri` | `https://oauth2.googleapis.com/token` |
+| `private_key_id` | *(unique per key — regenerate if compromised)* |
+| `private_key` | *(RSA private key — NEVER share or commit this)* |
+
+**How it's used:**
+- The backend loads it via `FIREBASE_CREDENTIALS_PATH` env var (local) or `FIREBASE_CREDENTIALS_JSON` env var (Render deployment)
+- It grants the backend Admin SDK access to Firestore (save stats, leaderboard), Realtime Database (room management), and Auth (token verification)
+- RTDB security rules are bypassed by Admin SDK — this is how the backend creates rooms and assigns ranks without client-writable paths
+
+### Firebase CLI Setup
+
+The Firebase CLI is used to deploy security rules (Firestore + Realtime Database). The project includes `firebase.json` and `.firebaserc` pre-configured for the `taklatype` project.
+
+```bash
+# Install Firebase CLI (if not already installed)
+npm install -g firebase-tools
+
+# Authenticate with your Google account (opens browser)
+firebase login
+
+# Verify the project is linked
+cd type-racer
+firebase projects:list
+```
+
+### Deploy Security Rules
+
+After authenticating, deploy the security rules with:
+
+```bash
+cd type-racer
+
+# Deploy both Firestore and RTDB rules
+firebase deploy --only firestore:rules,database
+
+# Or deploy them individually
+firebase deploy --only firestore:rules
+firebase deploy --only database
+```
+
+The rule files are:
+- `firestore.rules` — Firestore security rules
+- `database.rules.json` — Realtime Database security rules
 
 **Firestore** (`firestore.rules`):
 ```
@@ -204,7 +270,9 @@ All endpoints requiring auth expect a Firebase ID token in the `Authorization: B
 type-racer/
 ├── .env                          # Local secrets (NOT in git)
 ├── .env.example                  # Template
+├── .firebaserc                   # Firebase project alias (default: taklatype)
 ├── .gitignore
+├── firebase.json                 # Firebase CLI config (rules + hosting)
 ├── requirements.txt
 ├── render.yaml                   # Render deployment config
 ├── firestore.rules               # Firestore security rules

@@ -284,20 +284,32 @@ function resetStatDisplay() {
 
 // ─── Render Sentence ──────────────────────────────────────────────────────────
 function renderSentence() {
-  sentenceDisplay.innerHTML = targetSentence
-    .split('')
-    .map((ch, i) => {
-      const cursor  = i === cursorIndex ? ' cursor' : '';
-      const dotCls  = sentenceBoundaries.has(i) ? ' sentence-dot' : '';
-      const display = ch === ' ' ? '&nbsp;' : ch;
-      return `<span class="char remaining${cursor}${dotCls}">${display}</span>`;
-    })
-    .join('');
+  // Wrap each word in an inline-block container so words don't split across lines
+  let html = '';
+  let inWord = false;
+  for (let i = 0; i < targetSentence.length; i++) {
+    const ch      = targetSentence[i];
+    const cursor  = i === cursorIndex ? ' cursor' : '';
+    const dotCls  = sentenceBoundaries.has(i) ? ' sentence-dot' : '';
+    if (ch === ' ') {
+      if (inWord) { html += '</span>'; inWord = false; }
+      html += `<span class="char remaining${cursor}${dotCls}">&nbsp;</span>`;
+    } else {
+      if (!inWord) { html += '<span class="word">'; inWord = true; }
+      html += `<span class="char remaining${cursor}${dotCls}">${ch}</span>`;
+    }
+  }
+  if (inWord) html += '</span>';
+  sentenceDisplay.innerHTML = html;
 }
 
 // ─── Targeted span updates ───────────────────────────────────────────────────
+function getCharSpans() {
+  return sentenceDisplay.querySelectorAll('.char');
+}
+
 function setCharState(index, state) {
-  const span = sentenceDisplay.children[index];
+  const span = getCharSpans()[index];
   if (!span) return;
   const hasCursor = span.classList.contains('cursor');
   const dotCls    = sentenceBoundaries.has(index) ? ' sentence-dot' : '';
@@ -305,9 +317,10 @@ function setCharState(index, state) {
 }
 
 function moveCursor(from, to) {
-  sentenceDisplay.children[from]?.classList.remove('cursor');
+  const spans = getCharSpans();
+  spans[from]?.classList.remove('cursor');
   if (to < targetSentence.length) {
-    const next = sentenceDisplay.children[to];
+    const next = spans[to];
     next?.classList.add('cursor');
     next?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
@@ -397,7 +410,7 @@ function spawnParticle(charIndex) {
   const now = Date.now();
   if (now - lastParticleMs < 40) return;
   lastParticleMs = now;
-  const span = sentenceDisplay.children[charIndex];
+  const span = getCharSpans()[charIndex];
   if (!span) return;
   const r   = span.getBoundingClientRect();
   const p   = document.createElement('span');
@@ -488,11 +501,11 @@ function handleCharInput(char) {
   cursorIndex++;
   moveCursor(idx, cursorIndex);
 
-  const span = sentenceDisplay.children[idx];
-  if (span) {
+  const charSpan = getCharSpans()[idx];
+  if (charSpan) {
     const cls = isCorrect ? 'just-typed' : 'just-wrong';
-    span.classList.add(cls);
-    span.addEventListener('animationend', () => span.classList.remove(cls), { once: true });
+    charSpan.classList.add(cls);
+    charSpan.addEventListener('animationend', () => charSpan.classList.remove(cls), { once: true });
   }
 
   if (isCorrect) {

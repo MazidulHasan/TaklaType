@@ -91,9 +91,12 @@ source .venv/bin/activate
 
 pip install -r requirements.txt
 
-# 3. Configure environment
+# 3. Configure environment (required for auth/multiplayer/leaderboard)
 cp .env.example .env
-# Edit .env — add your Firebase credentials path and RTDB URL
+# Edit .env with actual values:
+#   FIREBASE_CREDENTIALS_PATH=./firebase-service-account.json
+#   FIREBASE_DATABASE_URL=https://taklatype-default-rtdb.firebaseio.com
+# Also place your firebase-service-account.json in type-racer/
 
 # 4. Start the server
 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload

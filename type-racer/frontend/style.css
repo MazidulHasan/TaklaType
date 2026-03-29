@@ -614,6 +614,10 @@ body {
 .loading-text { color: var(--muted); font-size: 1rem; }
 
 /* ---------- Characters ---------- */
+.word {
+  display:      inline-block;
+  white-space:  nowrap;
+}
 .char {
   position: relative;
   display:  inline-block;
@@ -1436,7 +1440,7 @@ body {
   font-weight:  700;
   color:        var(--muted);
 }
-.mp-bar-name { min-width: 100px; color: var(--text); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mp-bar-name { width: 90px; max-width: 90px; flex-shrink: 0; color: var(--text); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .mp-bar-track {
   flex:          1;
   height:        8px;

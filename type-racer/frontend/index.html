@@ -295,7 +295,7 @@
       <!-- Host: rematch setup (shown after clicking Play Again) -->
       <div id="mp-rematch-setup" style="display:none">
         <p class="mp-rematch-label">Set up next race</p>
-        <div class="mp-section-box">
+        <div class="mp-section-box" id="mp-rematch-selectors">
           <div class="mp-lines-row">
             <span class="mp-lines-label">Lines</span>
             <div class="mp-lines-pills" id="mp-rematch-lines">
@@ -316,6 +316,13 @@
               <button class="mp-line-pill" data-rematch-cat="love">Love</button>
             </div>
           </div>
+        </div>
+        <div class="mp-section-box mp-custom-row">
+          <label class="mp-custom-toggle-row">
+            <span class="mp-lines-label">Custom sentence</span>
+            <span class="toggle-switch" id="mp-rematch-custom-toggle"><span class="toggle-knob"></span></span>
+          </label>
+          <textarea class="mp-custom-input" id="mp-rematch-custom-input" placeholder="Type your custom sentence here…" rows="2" style="display:none"></textarea>
         </div>
         <button class="btn-restart btn-modal-restart" id="mp-start-new-race-btn">▶ Start New Race</button>
         <button class="btn-mp-result-leave" id="mp-result-leave-btn3">Leave Room</button>

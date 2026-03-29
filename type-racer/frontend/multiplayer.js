@@ -88,6 +88,21 @@ async function _initMultiplayer() {
   const mpCustomSaveRow    = document.getElementById('mp-custom-save-row');
   const mpCustomSaveCb     = document.getElementById('mp-custom-save-cb');
 
+  // Rematch custom sentence elements
+  const mpRematchCustomToggle = document.getElementById('mp-rematch-custom-toggle');
+  const mpRematchCustomInput  = document.getElementById('mp-rematch-custom-input');
+  const mpRematchSelectors    = document.getElementById('mp-rematch-selectors');
+  let _useRematchCustom       = false;
+
+  if (mpRematchCustomToggle) {
+    mpRematchCustomToggle.addEventListener('click', () => {
+      _useRematchCustom = !_useRematchCustom;
+      mpRematchCustomToggle.classList.toggle('active', _useRematchCustom);
+      if (mpRematchCustomInput)  mpRematchCustomInput.style.display  = _useRematchCustom ? '' : 'none';
+      if (mpRematchSelectors)    mpRematchSelectors.style.display    = _useRematchCustom ? 'none' : '';
+    });
+  }
+
   const btnCustomRace = document.getElementById('btn-custom-race');
 
   // ── State ───────────────────────────────────────────────────────────────────
@@ -633,10 +648,18 @@ async function _initMultiplayer() {
       mpStartNewRaceBtn.textContent = 'Starting…';
       try {
         const token = await getIdToken();
+        const customText = _useRematchCustom ? (mpRematchCustomInput?.value.trim() || '') : '';
         await fetch(`${API_BASE}/reset-room/${roomCode}?count=${_rematchLines}&category=${_rematchCategory}`, {
-          method: 'POST', headers: { Authorization: `Bearer ${token}` },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ custom_sentence: customText }),
         });
       } catch (_) {}
+      // Reset rematch custom state
+      _useRematchCustom = false;
+      if (mpRematchCustomToggle) mpRematchCustomToggle.classList.remove('active');
+      if (mpRematchCustomInput)  { mpRematchCustomInput.style.display = 'none'; mpRematchCustomInput.value = ''; }
+      if (mpRematchSelectors)    mpRematchSelectors.style.display = '';
       _resetResultPanel();
       mpResultPanel.classList.remove('show');
       _showView('room');
