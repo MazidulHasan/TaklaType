@@ -73,13 +73,24 @@ async function _initAuth() {
     if (user) {
       authBtn.style.display   = 'none';
       userPanel.style.display = 'flex';
-      userNameEl.textContent  = user.displayName || user.email || 'User';
-      if (user.photoURL) { userAvatar.src = user.photoURL; userAvatar.style.display = 'block'; }
-      else { userAvatar.style.display = 'none'; }
+      // Detect guest users: Firebase Anonymous Auth OR custom-token with "anon_" UID prefix
+      const isGuest = user.isAnonymous || String(user.uid || '').startsWith('anon_');
+      if (isGuest) {
+        // Guest session — show auto-assigned name from localStorage
+        userNameEl.textContent   = localStorage.getItem('anon-display-name') || 'Guest';
+        userAvatar.style.display = 'none';
+        userPanel.classList.add('is-anon-user');
+      } else {
+        userNameEl.textContent  = user.displayName || user.email || 'User';
+        if (user.photoURL) { userAvatar.src = user.photoURL; userAvatar.style.display = 'block'; }
+        else { userAvatar.style.display = 'none'; }
+        userPanel.classList.remove('is-anon-user');
+      }
       _closeModal();
       setTimeout(_startRippleLoop, 80);
     } else {
       _stopRippleLoop();
+      userPanel.classList.remove('is-anon-user');
       authBtn.style.display   = 'flex';
       userPanel.style.display = 'none';
     }

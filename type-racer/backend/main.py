@@ -153,20 +153,24 @@ def health_check():
 
 
 @app.get("/get-sentence")
-def get_sentence(category: str = Query(default="general")):
-    """Return a single random Banglish sentence."""
+def get_sentence(category: str = Query(default="general"), lang: str = Query(default="bn")):
+    """Return a single random sentence (Banglish or English based on lang)."""
     try:
-        return {"sentence": get_random_sentence(category)}
+        return {"sentence": get_random_sentence(category, lang)}
     except Exception:
         return JSONResponse(status_code=500, content={"error": "Sentence file not found"})
 
 
 @app.get("/get-sentences")
-def get_sentences(count: int = Query(default=1, ge=1, le=5), category: str = Query(default="general")):
+def get_sentences(
+    count: int = Query(default=1, ge=1, le=5),
+    category: str = Query(default="general"),
+    lang: str = Query(default="bn"),
+):
     """Return `count` unique random sentences joined as one race target."""
     try:
-        sentences = get_random_sentences(count, category)
-        return {"sentence": " ".join(sentences), "sentences": sentences, "count": count, "category": category}
+        sentences = get_random_sentences(count, category, lang)
+        return {"sentence": " ".join(sentences), "sentences": sentences, "count": count, "category": category, "lang": lang}
     except Exception:
         return JSONResponse(status_code=500, content={"error": "Sentence file not found"})
 
@@ -328,6 +332,8 @@ def create_room_endpoint(
     authorization: str = Header(default=""),
     count: int = Query(default=1, ge=1, le=5),
     category: str = Query(default="general"),
+    lang: str = Query(default="bn"),
+    display_name: str = Query(default=""),
 ):
     """Create a multiplayer room and return its code + sentence."""
     user = _verify_auth(authorization)
@@ -338,9 +344,10 @@ def create_room_endpoint(
 
     from backend.room_manager import create_room
     sentence = body.custom_sentence.strip() if body.custom_sentence.strip() else \
-               " ".join(get_random_sentences(count, category))
+               " ".join(get_random_sentences(count, category, lang))
+    player_name = display_name.strip() or user.get("name") or "Anonymous"
     try:
-        code = create_room(user["uid"], user.get("name", "Anonymous"), sentence,
+        code = create_room(user["uid"], player_name, sentence,
                            photo_url=user.get("picture", ""))
         return {"code": code, "sentence": sentence}
     except Exception as exc:
@@ -348,7 +355,11 @@ def create_room_endpoint(
 
 
 @app.post("/join-room/{code}")
-def join_room_endpoint(code: str, authorization: str = Header(default="")):
+def join_room_endpoint(
+    code: str,
+    authorization: str = Header(default=""),
+    display_name: str = Query(default=""),
+):
     """Join an existing room that is still waiting."""
     user = _verify_auth(authorization)
     if not user:
@@ -363,8 +374,8 @@ def join_room_endpoint(code: str, authorization: str = Header(default="")):
     if room.get("status") not in ("waiting",):
         return JSONResponse(status_code=409, content={"error": "Race already started"})
 
-    join_room(code.upper(), user["uid"], user.get("name", "Anonymous"),
-              photo_url=user.get("picture", ""))
+    player_name = display_name.strip() or user.get("name") or "Anonymous"
+    join_room(code.upper(), user["uid"], player_name, photo_url=user.get("picture", ""))
     return {"sentence": room["sentence"], "hostUid": room["hostUid"]}
 
 
@@ -412,6 +423,7 @@ def reset_room_endpoint(
     body: ResetRoomBody = ResetRoomBody(),
     count: int = 1,
     category: str = "general",
+    lang: str = Query(default="bn"),
     authorization: str = Header(default=""),
 ):
     """Host resets a finished room back to waiting for another round."""
@@ -429,7 +441,7 @@ def reset_room_endpoint(
         return JSONResponse(status_code=403, content={"error": "Only the host can reset the room"})
 
     sentence = body.custom_sentence.strip() if body.custom_sentence.strip() else \
-               " ".join(get_random_sentences(max(1, count), category))
+               " ".join(get_random_sentences(max(1, count), category, lang))
     reset_room(code.upper(), sentence)
     return {"ok": True, "sentence": sentence}
 
@@ -464,3 +476,31 @@ def leave_room_endpoint(code: str, authorization: str = Header(default="")):
     from backend.room_manager import leave_room
     leave_room(code.upper(), user["uid"])
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Anonymous / Guest play — custom token auth (no Anonymous Auth required)
+# ---------------------------------------------------------------------------
+
+@app.post("/anon/token")
+def get_anon_token(x_anon_id: str = Header(default="")):
+    """
+    Mint a Firebase custom auth token for an anonymous/guest player.
+    The client uses this with signInWithCustomToken() so all Firebase
+    operations (RTDB reads/writes, etc.) work without enabling Anonymous Auth.
+    """
+    if not x_anon_id or len(x_anon_id) < 8:
+        return JSONResponse(status_code=400, content={"error": "Invalid anon ID"})
+    try:
+        from backend.firebase_admin_init import get_firebase_app
+        from firebase_admin import auth as fb_auth
+        app = get_firebase_app()
+        if app is None:
+            return JSONResponse(status_code=503, content={"error": "Firebase not configured"})
+        # Prefix with "anon_" so guest UIDs are clearly distinguishable from real ones.
+        # Truncate to 128 chars (Firebase UID limit).
+        uid = f"anon_{x_anon_id[:36]}"
+        token_bytes = fb_auth.create_custom_token(uid, app=app)
+        return {"token": token_bytes.decode("utf-8")}
+    except Exception as exc:
+        return JSONResponse(status_code=503, content={"error": str(exc)})

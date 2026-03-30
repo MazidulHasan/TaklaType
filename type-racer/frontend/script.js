@@ -64,6 +64,7 @@ let totalErrors        = 0;
 let finished           = false;
 let selectedLines      = 1;
 let selectedCategory   = 'general';
+let selectedLang       = localStorage.getItem('taklatype-lang') || 'bn';
 let keyErrors          = {}; // char → error count
 let confettiRafId      = null;
 let lastParticleMs     = 0;
@@ -204,6 +205,19 @@ document.querySelectorAll('.pill[data-solocat]').forEach(btn => {
   });
 });
 
+// ─── Language Toggle ──────────────────────────────────────────────────────────
+// Apply saved lang on load
+document.querySelectorAll('#solo-lang-pills .lang-pill').forEach(btn => {
+  btn.classList.toggle('active', btn.dataset.lang === selectedLang);
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#solo-lang-pills .lang-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    selectedLang = btn.dataset.lang;
+    localStorage.setItem('taklatype-lang', selectedLang);
+    fetchSentence();
+  });
+});
+
 // ─── Focus Management ─────────────────────────────────────────────────────────
 function focusInput() {
   typingInput.focus({ preventScroll: true });
@@ -228,7 +242,7 @@ async function fetchSentence() {
   sentenceContainer.classList.remove('hide-hint');
 
   try {
-    const res  = await fetch(`${API_BASE}/get-sentences?count=${selectedLines}&category=${selectedCategory}`);
+    const res  = await fetch(`${API_BASE}/get-sentences?count=${selectedLines}&category=${selectedCategory}&lang=${selectedLang}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 

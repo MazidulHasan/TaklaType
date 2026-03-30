@@ -1,6 +1,6 @@
 """
 sentence_loader.py
-Loads sentences from data/sentences.json.
+Loads sentences from data/sentences.json (Banglish) and data/sentences_en.json (English).
 Supports categories: general, office, food, motivation, love.
 User-submitted sentences go into "pending" and require admin approval.
 """
@@ -9,11 +9,13 @@ import json
 import random
 from pathlib import Path
 
-_DATA_FILE = Path(__file__).parent.parent / "data" / "sentences.json"
+_DATA_FILE    = Path(__file__).parent.parent / "data" / "sentences.json"
+_DATA_FILE_EN = Path(__file__).parent.parent / "data" / "sentences_en.json"
 
 CATEGORIES = ["general", "office", "food", "motivation", "love"]
 
-_data: dict[str, list] = {}   # live in-memory store (mirrors the JSON file)
+_data:    dict[str, list] = {}   # Banglish sentences (mirrors sentences.json)
+_en_data: dict[str, list] = {}   # English sentences (mirrors sentences_en.json)
 
 
 def _read_json() -> dict:
@@ -27,29 +29,40 @@ def _write_json(data: dict) -> None:
 
 
 def load_sentences() -> None:
-    """Read and cache all sentences from the JSON file."""
-    global _data
+    """Read and cache all sentences from the JSON files (Banglish + English)."""
+    global _data, _en_data
     _data = _read_json()
     if not _data.get("general"):
         raise FileNotFoundError(f"sentences.json not found or 'general' key is empty: {_DATA_FILE}")
-    # Ensure pending key exists
     _data.setdefault("pending", [])
+    # Load English sentences (optional — falls back to Banglish if not found)
+    try:
+        with open(_DATA_FILE_EN, encoding="utf-8") as f:
+            _en_data = json.load(f)
+        print("[OK] English sentences loaded.")
+    except FileNotFoundError:
+        _en_data = {}
+        print("[INFO] sentences_en.json not found — English mode will fall back to Banglish.")
 
 
-def _get_pool(category: str) -> list[str]:
-    cat  = category.lower() if category else "general"
-    pool = _data.get(cat) or _data.get("general", [])
+def _get_pool(category: str, lang: str = "bn") -> list[str]:
+    cat      = category.lower() if category else "general"
+    src      = _en_data if (lang == "en" and _en_data) else _data
+    pool     = src.get(cat) or src.get("general", [])
+    if not pool:
+        # Fall back to Banglish general if nothing found
+        pool = _data.get("general", [])
     if not pool:
         raise RuntimeError("Sentences not loaded yet.")
     return pool
 
 
-def get_random_sentence(category: str = "general") -> str:
-    return random.choice(_get_pool(category))
+def get_random_sentence(category: str = "general", lang: str = "bn") -> str:
+    return random.choice(_get_pool(category, lang))
 
 
-def get_random_sentences(count: int, category: str = "general") -> list[str]:
-    pool  = _get_pool(category)
+def get_random_sentences(count: int, category: str = "general", lang: str = "bn") -> list[str]:
+    pool  = _get_pool(category, lang)
     count = max(1, min(count, len(pool)))
     return random.sample(pool, count)
 

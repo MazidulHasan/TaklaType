@@ -1,11 +1,33 @@
 /**
  * multiplayer.js – Phase 2B real-time multiplayer for TaklaType.
  * Uses Firebase Realtime Database for live room state + player progress.
+ * Supports anonymous (guest) play via Firebase Anonymous Auth.
  */
 
 import { rtdb, isConfigured } from './firebase-config.js';
 import { getCurrentUser, getIdToken } from './auth.js';
 import { showToast } from './toast.js';
+
+// ─── Anonymous player name pool (50 names) ───────────────────────────────────
+const ANON_NAMES = [
+  'SwiftFalcon',  'BraveEagle',   'QuickFox',       'BoldLion',       'FleetHorse',
+  'SharpHawk',    'FastPanther',  'NimbleCat',       'SwiftOtter',     'BoldWolf',
+  'QuickCrane',   'BraveOwl',     'FleetDeer',       'SharpMarten',    'FastFerret',
+  'NimbleMonkey', 'SwiftDolphin', 'BoldSeal',        'QuickParrot',    'BraveRaven',
+  'FleetLeopard', 'SharpTiger',   'FastCheetah',     'SwiftKite',      'BoldBull',
+  'QuickBear',    'BraveBoar',    'FleetZebra',      'SharpLynx',      'FastJaguar',
+  'NimbleApe',    'SwiftBadger',  'BoldCrow',        'QuickBat',       'BraveFlamingo',
+  'FleetGazelle', 'SharpMagpie', 'FastRabbit',      'NimbleSquirrel', 'SwiftSparrow',
+  'BoldMoose',    'QuickMink',    'BraveHeron',      'FleetCondor',    'SharpFalcon',
+  'FastWildcat',  'SwiftViper',   'BoldRhino',       'QuickPuma',      'BraveLynx',
+];
+
+// 12 distinct colors for player avatars (derived from UID hash)
+const ANON_COLORS = [
+  '#e2b714', '#00bcd4', '#66bb6a', '#ff7043', '#ab47bc',
+  '#ef5350', '#42a5f5', '#26a69a', '#ec407a', '#7e57c2',
+  '#ff9800', '#26c6da',
+];
 
 const API_BASE = (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
   ? 'http://127.0.0.1:8000' : location.origin;
@@ -82,7 +104,17 @@ async function _initMultiplayer() {
       _rematchCategory = pill.dataset.rematchCat;
     });
   });
+  document.querySelectorAll('#mp-rematch-lang .mp-line-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('#mp-rematch-lang .mp-line-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      _rematchLang = pill.dataset.rematchLang;
+      localStorage.setItem('taklatype-lang', _rematchLang);
+    });
+  });
+
   const mpLinePills        = document.querySelectorAll('.mp-line-pill[data-mpcount]');
+  const mpAnonJoinView     = document.getElementById('mp-anon-join-view');
   const mpCustomToggle     = document.getElementById('mp-custom-toggle');
   const mpCustomInput      = document.getElementById('mp-custom-input');
   const mpCustomSaveRow    = document.getElementById('mp-custom-save-row');
@@ -121,6 +153,12 @@ async function _initMultiplayer() {
   let _raceStartMs      = 0;
   let _selectedLines    = 1;
   let _selectedCategory = 'general';
+  // Anon / guest mode
+  let _isAnonMode       = false;
+  let _anonDisplayName  = '';
+  // Language selection (synced with solo mode via localStorage)
+  let _selectedLang  = localStorage.getItem('taklatype-lang') || 'bn';
+  let _rematchLang   = _selectedLang;
 
   // ── Custom sentence toggle ───────────────────────────────────────────────────
   const mpLobbySelectors = document.getElementById('mp-lobby-selectors');
@@ -152,10 +190,36 @@ async function _initMultiplayer() {
     });
   });
 
+  // ── Language toggle (lobby) ──────────────────────────────────────────────────
+  // Sync pill active state with localStorage on init
+  document.querySelectorAll('#mp-lang-pills .mp-line-pill').forEach(pill => {
+    pill.classList.toggle('active', pill.dataset.mplang === _selectedLang);
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('#mp-lang-pills .mp-line-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      _selectedLang = pill.dataset.mplang;
+      _rematchLang  = _selectedLang;
+      localStorage.setItem('taklatype-lang', _selectedLang);
+    });
+  });
+
+  // Sync the mp-lang-pills active state with _selectedLang
+  function _syncMpLangPills() {
+    _selectedLang = localStorage.getItem('taklatype-lang') || 'bn';
+    _rematchLang  = _selectedLang;
+    document.querySelectorAll('#mp-lang-pills .mp-line-pill').forEach(p => {
+      p.classList.toggle('active', p.dataset.mplang === _selectedLang);
+    });
+  }
+
   // ── Open/close lobby modal ──────────────────────────────────────────────────
   mpBtn.addEventListener('click', () => {
     const user = getCurrentUser();
-    if (!user) { showToast('Please sign in to play multiplayer.', 'info'); return; }
+    if (!user) { showToast('Please sign in to use the Multiplayer tab, or click "Guest" to play without an account.', 'info', 3500); return; }
+    const guestUser  = _isGuestUid(user.uid) || user.isAnonymous;
+    _isAnonMode      = guestUser;
+    _anonDisplayName = guestUser ? _getAnonDisplayName(user.uid) : '';
+    _syncMpLangPills();
     _showView('lobby');
     mpOverlay.classList.add('show');
     mpError.textContent = '';
@@ -175,10 +239,50 @@ async function _initMultiplayer() {
 
   // ── View switcher ───────────────────────────────────────────────────────────
   function _showView(name) {
-    mpLobbyView.style.display      = name === 'lobby'        ? '' : 'none';
-    mpRoomView.style.display       = name === 'room'         ? '' : 'none';
+    mpLobbyView.style.display        = name === 'lobby'       ? '' : 'none';
+    mpRoomView.style.display         = name === 'room'        ? '' : 'none';
     if (mpJoinLoadingView)
-      mpJoinLoadingView.style.display = name === 'join-loading' ? '' : 'none';
+      mpJoinLoadingView.style.display  = name === 'join-loading' ? '' : 'none';
+    if (mpAnonJoinView)
+      mpAnonJoinView.style.display     = name === 'anon-join'  ? '' : 'none';
+  }
+
+  // ── Guest / Anonymous play button ───────────────────────────────────────────
+  const anonPlayBtn  = document.getElementById('anon-play-btn');
+  const _anonBtnHTML = anonPlayBtn ? anonPlayBtn.innerHTML : '';
+
+  if (anonPlayBtn) {
+    anonPlayBtn.addEventListener('click', async () => {
+      _isAnonMode = true;
+      const user  = getCurrentUser();
+      if (!user) {
+        // Sign in via backend custom token (works without enabling Anonymous Auth)
+        anonPlayBtn.disabled   = true;
+        anonPlayBtn.innerHTML  = 'Connecting…';
+        try {
+          const result = await _signInAsGuest();
+          _anonDisplayName = result.displayName;
+        } catch (err) {
+          showToast(`Guest sign-in failed: ${err.message}`, 'error', 4000);
+          anonPlayBtn.disabled  = false;
+          anonPlayBtn.innerHTML = _anonBtnHTML;
+          _isAnonMode = false;
+          return;
+        }
+        anonPlayBtn.disabled  = false;
+        anonPlayBtn.innerHTML = _anonBtnHTML;
+      } else if (_isGuestUid(user.uid) || user.isAnonymous) {
+        _anonDisplayName = _getAnonDisplayName(user.uid);
+      } else {
+        // Already signed-in with real account — open normal MP modal
+        _isAnonMode      = false;
+        _anonDisplayName = '';
+      }
+      _syncMpLangPills();
+      _showView('lobby');
+      mpOverlay.classList.add('show');
+      mpError.textContent = '';
+    });
   }
 
   // ── Create room ─────────────────────────────────────────────────────────────
@@ -187,13 +291,17 @@ async function _initMultiplayer() {
     mpCreateBtn.disabled    = true;
     mpCreateBtn.textContent = 'Creating…';
     try {
-      const token = await getIdToken();
+      const token      = await getIdToken();
       const customText = _useCustomSentence ? (mpCustomInput?.value.trim() || '') : '';
-      const resp  = await fetch(`${API_BASE}/create-room?count=${_selectedLines}&category=${_selectedCategory}`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body:    JSON.stringify({ custom_sentence: customText }),
-      });
+      const nameParam  = _anonDisplayName ? `&display_name=${encodeURIComponent(_anonDisplayName)}` : '';
+      const resp  = await fetch(
+        `${API_BASE}/create-room?count=${_selectedLines}&category=${_selectedCategory}&lang=${_selectedLang}${nameParam}`,
+        {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body:    JSON.stringify({ custom_sentence: customText }),
+        },
+      );
       // Submit custom sentence for admin review
       if (customText && mpCustomSaveCb?.checked) {
         fetch(`${API_BASE}/add-sentence`, {
@@ -228,8 +336,9 @@ async function _initMultiplayer() {
     mpJoinBtn.disabled    = true;
     mpJoinBtn.textContent = 'Joining…';
     try {
-      const token = await getIdToken();
-      const resp  = await fetch(`${API_BASE}/join-room/${code}`, {
+      const token     = await getIdToken();
+      const nameParam = _anonDisplayName ? `?display_name=${encodeURIComponent(_anonDisplayName)}` : '';
+      const resp  = await fetch(`${API_BASE}/join-room/${code}${nameParam}`, {
         method: 'POST', headers: { Authorization: `Bearer ${token}` },
       });
       const data = await resp.json();
@@ -361,7 +470,11 @@ async function _initMultiplayer() {
           ? ' <span class="mp-ready-tag">READY</span>'
           : ' <span class="mp-not-ready-tag">not ready</span>')
         : '';
-      return `<li class="mp-player-item">${_esc(p.displayName)}${youTag}${hostTag}${readyTag}</li>`;
+      const avatarColor = _uidToColor(uid);
+      const avatar = p.photoURL
+        ? `<img class="mp-list-avatar-img" src="${_esc(p.photoURL)}" alt="" onerror="this.style.display='none'">`
+        : `<span class="mp-list-avatar" style="background:${avatarColor}">${_esc((p.displayName || '?')[0].toUpperCase())}</span>`;
+      return `<li class="mp-player-item">${avatar}${_esc(p.displayName)}${youTag}${hostTag}${readyTag}</li>`;
     }).join('') || `<li class="mp-player-item" style="color:var(--muted)">Waiting for players…</li>`;
 
     if (isHost) {
@@ -433,8 +546,10 @@ async function _initMultiplayer() {
     _selfFinished = false;
     _raceStartMs  = Date.now();
     // Hide solo controls during multiplayer race
+    const langBar  = document.querySelector('.lang-toggle-bar');
     const lineSel  = document.querySelector('.line-selector');
     const controls = document.querySelector('.controls');
+    if (langBar)  langBar.style.display  = 'none';
     if (lineSel)  lineSel.style.display  = 'none';
     if (controls) controls.style.display = 'none';
     if (window.__tt) {
@@ -510,14 +625,15 @@ async function _initMultiplayer() {
       const you    = uid === user?.uid ? ' (you)' : '';
       const pct    = Math.min(p.progress || 0, 100);
       const finTag = p.finished ? ` <span class="mp-bar-rank">#${p.rank}</span>` : '';
+      const color  = _uidToColor(uid);
       const avatar = p.photoURL
         ? `<img class="mp-bar-avatar" src="${_esc(p.photoURL)}" alt="" onerror="this.style.display='none'">`
-        : `<span class="mp-bar-avatar-fb">${_esc((p.displayName || '?')[0].toUpperCase())}</span>`;
+        : `<span class="mp-bar-avatar-fb" style="background:${color}">${_esc((p.displayName || '?')[0].toUpperCase())}</span>`;
       return `<div class="mp-bar-row">
         ${avatar}
         <span class="mp-bar-name">${_esc(p.displayName)}${you}</span>
         <div class="mp-bar-track">
-          <div class="mp-bar-fill" style="width:${pct}%"></div>
+          <div class="mp-bar-fill" style="width:${pct}%;background:${color}"></div>
         </div>
         <span class="mp-bar-wpm">${p.wpm || 0} WPM${finTag}</span>
       </div>`;
@@ -569,10 +685,11 @@ async function _initMultiplayer() {
     const sortedUids = [...Object.entries(players).filter(([,p]) => p.finished).sort((a,b) => a[1].rank - b[1].rank),
                          ...Object.entries(players).filter(([,p]) => !p.finished)];
     mpResultList.innerHTML = sortedUids.map(([uid, p]) => {
-      const pos = p.finished ? `#${p.rank}` : 'DNF';
+      const pos  = p.finished ? `#${p.rank}` : 'DNF';
+      const dot  = `<span class="mp-result-dot" style="background:${_uidToColor(uid)}"></span>`;
       return `<li class="mp-result-row" data-uid="${_esc(uid)}">
         <span class="mp-result-pos">${pos}</span>
-        <span class="mp-result-name">${_esc(p.displayName)}</span>
+        ${dot}<span class="mp-result-name">${_esc(p.displayName)}</span>
         <span class="mp-result-wpm">${p.wpm || 0} WPM</span>
         <span class="mp-result-rematch-icon" style="visibility:hidden" title="Wants to play again">↺</span>
       </li>`;
@@ -620,11 +737,15 @@ async function _initMultiplayer() {
       // Sync rematch pills to current selection
       _rematchLines    = _selectedLines;
       _rematchCategory = _selectedCategory;
+      _rematchLang     = _selectedLang;
       document.querySelectorAll('#mp-rematch-lines .mp-line-pill').forEach(p => {
         p.classList.toggle('active', parseInt(p.dataset.rematchCount, 10) === _rematchLines);
       });
       document.querySelectorAll('#mp-rematch-cat .mp-line-pill').forEach(p => {
         p.classList.toggle('active', p.dataset.rematchCat === _rematchCategory);
+      });
+      document.querySelectorAll('#mp-rematch-lang .mp-line-pill').forEach(p => {
+        p.classList.toggle('active', p.dataset.rematchLang === _rematchLang);
       });
       mpRematchSetup.style.display = '';
     } else {
@@ -649,11 +770,14 @@ async function _initMultiplayer() {
       try {
         const token = await getIdToken();
         const customText = _useRematchCustom ? (mpRematchCustomInput?.value.trim() || '') : '';
-        await fetch(`${API_BASE}/reset-room/${roomCode}?count=${_rematchLines}&category=${_rematchCategory}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ custom_sentence: customText }),
-        });
+        await fetch(
+          `${API_BASE}/reset-room/${roomCode}?count=${_rematchLines}&category=${_rematchCategory}&lang=${_rematchLang}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ custom_sentence: customText }),
+          },
+        );
       } catch (_) {}
       // Reset rematch custom state
       _useRematchCustom = false;
@@ -735,8 +859,10 @@ async function _initMultiplayer() {
     racePanel.style.display = 'none';
     mpResultPanel.classList.remove('show');
     // Restore solo controls
+    const langBar  = document.querySelector('.lang-toggle-bar');
     const lineSel  = document.querySelector('.line-selector');
     const controls = document.querySelector('.controls');
+    if (langBar)  langBar.style.display  = '';
     if (lineSel)  lineSel.style.display  = '';
     if (controls) controls.style.display = '';
     _showView('lobby');
@@ -763,7 +889,11 @@ async function _initMultiplayer() {
   if (btnCustomRace) {
     btnCustomRace.addEventListener('click', () => {
       const user = getCurrentUser();
-      if (!user) { showToast('Sign in to use Custom Race.', 'info'); return; }
+      if (!user) { showToast('Sign in (or click "Guest") to use Custom Race.', 'info'); return; }
+      const guestUser2 = _isGuestUid(user.uid) || user.isAnonymous;
+      _isAnonMode      = guestUser2;
+      _anonDisplayName = guestUser2 ? _getAnonDisplayName(user.uid) : '';
+      _syncMpLangPills();
       _showView('lobby');
       mpOverlay.classList.add('show');
       mpError.textContent = '';
@@ -785,46 +915,158 @@ async function _initMultiplayer() {
     const user = getCurrentUser();
 
     if (user) {
-      // Already signed in — show loading state in MP overlay then join
+      // Already signed in (real or guest) — join directly
+      if (_isGuestUid(user.uid) || user.isAnonymous) {
+        _isAnonMode      = true;
+        _anonDisplayName = _getAnonDisplayName(user.uid);
+      }
       if (mpJoinLoadingMsg) mpJoinLoadingMsg.textContent = `Joining room ${code}…`;
       _showView('join-loading');
       mpOverlay.classList.add('show');
       _joinByCode(code);
     } else {
-      // Not signed in — open auth modal with a notice, then auto-join after sign-in
-      const authRoomNotice     = document.getElementById('auth-room-notice');
-      const authRoomNoticeText = document.getElementById('auth-room-notice-text');
-      const authModal          = document.getElementById('auth-modal');
-      if (authRoomNoticeText) authRoomNoticeText.textContent = `Sign in to join room ${code}`;
-      if (authRoomNotice)     authRoomNotice.style.display   = '';
-      if (authModal)          authModal.classList.add('show');
+      // Not signed in — show the guest join prompt inside the MP overlay
+      const anonCodeEl = document.getElementById('mp-anon-join-code');
+      if (anonCodeEl) anonCodeEl.textContent = code;
+      _showView('anon-join');
+      mpOverlay.classList.add('show');
 
-      let _urlJoinDone = false;
-      const waitForAuth = setInterval(() => {
-        const u = getCurrentUser();
-        if (u && !_urlJoinDone) {
-          _urlJoinDone = true;
-          clearInterval(waitForAuth);
-          // Hide auth notice and modal, show join loading
-          if (authRoomNotice) authRoomNotice.style.display = 'none';
-          if (authModal)      authModal.classList.remove('show');
+      const guestJoinBtn  = document.getElementById('mp-anon-join-guest-btn');
+      const signInJoinBtn = document.getElementById('mp-anon-sign-in-btn');
+      const anonJoinError = document.getElementById('mp-anon-join-error');
+
+      if (guestJoinBtn) {
+        guestJoinBtn.addEventListener('click', async () => {
+          _isAnonMode = true;
+          guestJoinBtn.disabled    = true;
+          guestJoinBtn.textContent = 'Connecting…';
+          try {
+            const result = await _signInAsGuest();
+            _anonDisplayName = result.displayName;
+          } catch (err) {
+            if (anonJoinError) anonJoinError.textContent = `Could not connect: ${err.message}`;
+            guestJoinBtn.disabled    = false;
+            guestJoinBtn.textContent = '👤 Join as Guest';
+            return;
+          }
           if (mpJoinLoadingMsg) mpJoinLoadingMsg.textContent = `Joining room ${code}…`;
           _showView('join-loading');
-          mpOverlay.classList.add('show');
           _joinByCode(code);
-        }
-      }, 300);
-      // Give up after 2 minutes (user closed modal or gave up)
-      setTimeout(() => {
-        if (!_urlJoinDone) {
-          clearInterval(waitForAuth);
-          if (authRoomNotice) authRoomNotice.style.display = 'none';
-        }
-      }, 120_000);
+        }, { once: true });
+      }
+
+      if (signInJoinBtn) {
+        signInJoinBtn.addEventListener('click', () => {
+          mpOverlay.classList.remove('show');
+          const authModal          = document.getElementById('auth-modal');
+          const authRoomNotice     = document.getElementById('auth-room-notice');
+          const authRoomNoticeText = document.getElementById('auth-room-notice-text');
+          if (authRoomNoticeText) authRoomNoticeText.textContent = `Sign in to join room ${code}`;
+          if (authRoomNotice)     authRoomNotice.style.display   = '';
+          if (authModal)          authModal.classList.add('show');
+
+          let _urlJoinDone = false;
+          const waitForAuth = setInterval(() => {
+            const u = getCurrentUser();
+            if (u && !_urlJoinDone) {
+              _urlJoinDone = true;
+              clearInterval(waitForAuth);
+              if (authRoomNotice) authRoomNotice.style.display = 'none';
+              if (authModal)      authModal.classList.remove('show');
+              if (mpJoinLoadingMsg) mpJoinLoadingMsg.textContent = `Joining room ${code}…`;
+              _showView('join-loading');
+              mpOverlay.classList.add('show');
+              _joinByCode(code);
+            }
+          }, 300);
+          setTimeout(() => {
+            if (!_urlJoinDone) {
+              clearInterval(waitForAuth);
+              if (authRoomNotice) authRoomNotice.style.display = 'none';
+            }
+          }, 120_000);
+        }, { once: true });
+      }
     }
   }
 }
 
 function _esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/** True when the player is a guest (custom-token UID starts with "anon_"). */
+function _isGuestUid(uid) {
+  return String(uid || '').startsWith('anon_');
+}
+
+/** Get or create a stable anonymous session UUID stored in localStorage. */
+function _getOrCreateAnonId() {
+  let id = localStorage.getItem('anon-session-id');
+  if (!id) {
+    id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+    localStorage.setItem('anon-session-id', id);
+  }
+  return id;
+}
+
+/**
+ * Sign the user in as a guest using a Firebase custom token minted by the backend.
+ * This does NOT require "Anonymous" sign-in to be enabled in the Firebase console.
+ */
+async function _signInAsGuest() {
+  const uuid = _getOrCreateAnonId();
+
+  // Pre-assign a display name so the auth UI shows it immediately on sign-in
+  const idx  = Math.floor(Math.random() * ANON_NAMES.length);
+  const name = ANON_NAMES[idx];
+  localStorage.setItem('anon-display-name', name);
+
+  const API = (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+    ? 'http://127.0.0.1:8000' : location.origin;
+
+  // Ask the backend to mint a custom auth token for this UUID
+  const resp = await fetch(`${API}/anon/token`, {
+    headers: { 'X-Anon-Id': uuid },
+    method: 'POST',
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error || 'Could not create guest session');
+  }
+  const { token } = await resp.json();
+
+  // Sign in with the custom token — works with any Firebase project, no console settings needed
+  const { getAuth, signInWithCustomToken } =
+    await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+  const cred = await signInWithCustomToken(getAuth(), token);
+
+  // Finalize name from actual UID for cross-session consistency
+  const finalName = _getAnonDisplayName(cred.user.uid);
+  localStorage.setItem('anon-display-name', finalName);
+  return { user: cred.user, displayName: finalName };
+}
+
+/** Map a player UID to a consistent avatar color from the 12-color palette. */
+function _uidToColor(uid) {
+  const hash = String(uid).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  return ANON_COLORS[hash % ANON_COLORS.length];
+}
+
+/**
+ * Get (or assign) the anonymous display name for a given UID.
+ * Stored in localStorage so it persists across page reloads.
+ */
+function _getAnonDisplayName(uid) {
+  const savedUid  = localStorage.getItem('anon-uid');
+  const savedName = localStorage.getItem('anon-display-name');
+  if (savedUid === uid && savedName) return savedName;
+  const hash = String(uid).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  const name = ANON_NAMES[hash % ANON_NAMES.length];
+  localStorage.setItem('anon-uid',          uid);
+  localStorage.setItem('anon-display-name', name);
+  return name;
 }
