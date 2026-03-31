@@ -14,6 +14,13 @@ export async function getIdToken() {
 
 let _currentUser = null;
 
+// Resolves once the first onAuthStateChanged fires (user or null).
+// Lets callers wait for Firebase to restore a persisted session before acting.
+let _authReadyResolve;
+export const waitForAuthReady = isConfigured
+  ? new Promise(resolve => { _authReadyResolve = resolve; })
+  : Promise.resolve(null);
+
 if (!isConfigured) {
   // Hide auth elements — DOM is available since modules run after HTML is parsed
   const btn = document.getElementById('auth-btn');
@@ -70,6 +77,7 @@ async function _initAuth() {
   // Auth state
   onAuthStateChanged(auth, user => {
     _currentUser = user;
+    if (_authReadyResolve) { _authReadyResolve(user); _authReadyResolve = null; }
     if (user) {
       authBtn.style.display   = 'none';
       userPanel.style.display = 'flex';

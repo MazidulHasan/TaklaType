@@ -635,6 +635,44 @@ resultOverlay.addEventListener('click', e => { if (e.target === resultOverlay) f
 btnRestart.addEventListener('click',       () => fetchSentence());
 btnModalRestart.addEventListener('click',  () => fetchSentence());
 
+// ─── Solo Custom Text ─────────────────────────────────────────────────────────
+(function () {
+  const btnSoloCustom   = document.getElementById('btn-solo-custom');
+  const overlay         = document.getElementById('solo-custom-overlay');
+  const closeBtn        = document.getElementById('solo-custom-close');
+  const textarea        = document.getElementById('solo-custom-textarea');
+  const startBtn        = document.getElementById('btn-solo-custom-start');
+  if (!btnSoloCustom || !overlay) return;
+
+  function openModal() {
+    overlay.style.display = 'flex';
+    textarea.focus();
+  }
+  function closeModal() {
+    overlay.style.display = 'none';
+  }
+
+  btnSoloCustom.addEventListener('click', openModal);
+  closeBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+
+  startBtn.addEventListener('click', () => {
+    const text = textarea.value.trim();
+    if (!text) { textarea.focus(); return; }
+    closeModal();
+    // Bypass API fetch — set sentence directly and start the round
+    sentencesArray   = [text];
+    targetSentence   = text;
+    sentenceBoundaries = new Set();
+    initRound();
+  });
+
+  // Ctrl/Cmd+Enter also starts
+  textarea.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') startBtn.click();
+  });
+})();
+
 window.addEventListener('resize', () => {
   confettiCanvas.width  = window.innerWidth;
   confettiCanvas.height = window.innerHeight;

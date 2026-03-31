@@ -20,16 +20,29 @@ Race your friends by typing Banglish sentences (Bangla words written in English 
 - Error heatmap showing which characters you missed
 
 ### Multiplayer
-- Create a private room → share the link → race live
+- Single dropdown button — choose **Multiplayer** (sign-in required) or **Play as Guest** (no account needed)
+- Guest players get auto-assigned unique names and colour-coded avatars — no sign-up required
+- Signed-in and guest players can race together in the same room
+- Share room links — signed-in users join directly, others get a guest/sign-in prompt
 - Real-time progress bars for all players via Firebase RTDB
 - 3-2-1 countdown for synchronized race starts
 - 2-minute race timer with auto-finish
 - Live rank assignment as players finish
-- Play Again with host-controlled rematch settings (lines + category)
+- Play Again with host-controlled rematch settings (lines, category, language)
 - "Wants to play again" icon on the result screen per player
-- URL-based join with sign-in prompt for unauthenticated users
 - Host closes room → all players are automatically kicked with a message
-- Custom Race button on homepage — jump straight to a custom-sentence multiplayer room
+- **Custom Text** option in the multiplayer dropdown — race on any sentence you type
+
+### Typing Game
+- Character-by-character colour feedback — green for correct, red for wrong
+- Live WPM, accuracy, error count and timer
+- Progress bar and keystroke particles (7 styles)
+- **Banglish / English toggle** — switch all sentence categories between Banglish and English
+- 5 sentence categories: General, Office, Food, Motivation, Love
+- 1–5 sentence lines per race (longer = harder)
+- **Solo Custom Text** — type any text and race it solo (no multiplayer needed)
+- Confetti on finish with animated result modal
+- Error heatmap showing which characters you missed
 
 ### Auth & Stats
 - Google Sign-In and Email/Password via Firebase Auth

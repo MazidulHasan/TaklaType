@@ -40,12 +40,19 @@ All source lives under `type-racer/`:
 - Graceful degradation: if Firebase not configured, solo mode still works.
 
 ## Key Patterns
-- Settings persisted in localStorage (sound, timer, particles, fontSize, theme)
+- Settings persisted in localStorage (sound, timer, particles, fontSize, theme, `taklatype-lang`)
 - 7 particle styles: off, sparkle, fire, ash, snow, stars, bubbles
 - Sentence categories: general, office, food, motivation, love
 - 1-5 sentence lines per race
 - Room codes: 6-char alphanumeric, rooms auto-cleaned after 2hrs
 - Admin emails hardcoded in `main.py`
+- **Language toggle**: BN (Banglish) / EN (English) — `lang` param on `/get-sentences`, `/create-room`, `/reset-room`. English sentences in `data/sentences_en.json`
+- **Guest play**: Uses Firebase Custom Tokens minted by `POST /anon/token` (Admin SDK `create_custom_token`). Guest UID = `anon_<uuid>`. Does NOT require Anonymous Auth enabled in Firebase console. Name/color derived from UID hash. localStorage keys: `anon-session-id`, `anon-display-name`, `anon-uid`
+- **Auth ready signal**: `waitForAuthReady` promise exported from `auth.js` — resolves on first `onAuthStateChanged` fire. Used in URL auto-join to avoid showing guest prompt to already-signed-in users
+- Player avatars: colored circles, color from `_uidToColor(uid)` → 12-color ANON_COLORS palette in `multiplayer.js`
+- **Multiplayer dropdown**: Single trigger button `#mp-dropdown-trigger` opens menu with 3 options: `#mp-btn` (signed-in), `#anon-play-btn` (guest), `#btn-custom-race` (Custom Text)
+- **Solo Custom Text**: `#btn-solo-custom` opens a modal overlay. On submit, sets `sentencesArray`/`targetSentence` directly and calls `initRound()` — bypasses API fetch entirely
+- Guest users blocked from `#mp-btn` (regular Multiplayer) — shown toast to use "Play as Guest" instead
 
 ## Multiplayer Flow
 1. **Host creates room** -> POST /create-room -> RTDB room in "waiting" status
@@ -73,16 +80,17 @@ All source lives under `type-racer/`:
 ## API Endpoints
 | Method | Route | Auth | Purpose |
 |--------|-------|------|---------|
-| GET | `/get-sentence` | No | Random sentence |
-| GET | `/get-sentences?count=N&category=X` | No | N sentences joined |
+| GET | `/get-sentence?lang=bn` | No | Random sentence |
+| GET | `/get-sentences?count=N&category=X&lang=bn` | No | N sentences joined |
 | GET | `/categories` | No | List categories |
+| POST | `/anon/token` | No (X-Anon-Id header) | Mint custom Firebase token for guest |
 | POST | `/add-sentence` | Yes | Submit for review |
 | POST | `/save-result` | Yes | Save race stats to Firestore |
-| POST | `/create-room` | Yes | Create multiplayer room |
-| POST | `/join-room/{code}` | Yes | Join room |
+| POST | `/create-room?lang=bn&display_name=X` | Yes | Create multiplayer room |
+| POST | `/join-room/{code}?display_name=X` | Yes | Join room |
 | POST | `/start-race/{code}` | Yes | Start race (host only) |
 | POST | `/finish-player/{code}` | Yes | Finish + get rank |
-| POST | `/reset-room/{code}` | Yes | Rematch (host only) |
+| POST | `/reset-room/{code}?lang=bn` | Yes | Rematch (host only) |
 | DELETE | `/leave-room/{code}` | Yes | Leave room |
 | GET | `/admin-data` | Admin | Dashboard |
 | POST | `/approve-sentence/{idx}` | Admin | Approve pending |

@@ -5,7 +5,7 @@
  */
 
 import { rtdb, isConfigured } from './firebase-config.js';
-import { getCurrentUser, getIdToken } from './auth.js';
+import { getCurrentUser, getIdToken, waitForAuthReady } from './auth.js';
 import { showToast } from './toast.js';
 
 // ─── Anonymous player name pool (50 names) ───────────────────────────────────
@@ -34,13 +34,36 @@ const API_BASE = (location.hostname === '127.0.0.1' || location.hostname === 'lo
 
 // ─── Hide UI when Firebase not configured ────────────────────────────────────
 if (!isConfigured) {
-  const btn = document.getElementById('mp-btn');
-  if (btn) btn.style.display = 'none';
+  const wrap = document.getElementById('mp-dropdown-wrap');
+  if (wrap) wrap.style.display = 'none';
   const btnCR = document.getElementById('btn-custom-race');
   if (btnCR) btnCR.style.display = 'none';
 } else {
   _initMultiplayer();
 }
+
+// ─── Multiplayer dropdown toggle ─────────────────────────────────────────────
+(function () {
+  const trigger = document.getElementById('mp-dropdown-trigger');
+  const menu    = document.getElementById('mp-dropdown-menu');
+  if (!trigger || !menu) return;
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Scale-pop animation on the trigger
+    trigger.classList.remove('clicked');
+    void trigger.offsetWidth; // reflow to restart animation
+    trigger.classList.add('clicked');
+    trigger.addEventListener('animationend', () => trigger.classList.remove('clicked'), { once: true });
+    menu.classList.toggle('open');
+  });
+
+  // Close on outside click
+  document.addEventListener('click', () => menu.classList.remove('open'));
+
+  // Close when any option is picked
+  menu.addEventListener('click', () => menu.classList.remove('open'));
+})();
 
 // ─── Main init ───────────────────────────────────────────────────────────────
 async function _initMultiplayer() {
@@ -215,10 +238,13 @@ async function _initMultiplayer() {
   // ── Open/close lobby modal ──────────────────────────────────────────────────
   mpBtn.addEventListener('click', () => {
     const user = getCurrentUser();
-    if (!user) { showToast('Please sign in to use the Multiplayer tab, or click "Guest" to play without an account.', 'info', 3500); return; }
-    const guestUser  = _isGuestUid(user.uid) || user.isAnonymous;
-    _isAnonMode      = guestUser;
-    _anonDisplayName = guestUser ? _getAnonDisplayName(user.uid) : '';
+    if (!user) { showToast('Please sign in to use Multiplayer, or choose "Play as Guest" instead.', 'info', 3500); return; }
+    if (_isGuestUid(user.uid) || user.isAnonymous) {
+      showToast('You\'re signed in as a guest. Use "Play as Guest" to create or join rooms.', 'info', 3500);
+      return;
+    }
+    _isAnonMode      = false;
+    _anonDisplayName = '';
     _syncMpLangPills();
     _showView('lobby');
     mpOverlay.classList.add('show');
@@ -889,7 +915,7 @@ async function _initMultiplayer() {
   if (btnCustomRace) {
     btnCustomRace.addEventListener('click', () => {
       const user = getCurrentUser();
-      if (!user) { showToast('Sign in (or click "Guest") to use Custom Race.', 'info'); return; }
+      if (!user) { showToast('Sign in or play as Guest to use Custom Text multiplayer.', 'info'); return; }
       const guestUser2 = _isGuestUid(user.uid) || user.isAnonymous;
       _isAnonMode      = guestUser2;
       _anonDisplayName = guestUser2 ? _getAnonDisplayName(user.uid) : '';
@@ -912,19 +938,23 @@ async function _initMultiplayer() {
   const urlRoom = new URLSearchParams(location.search).get('room');
   if (urlRoom) {
     const code = urlRoom.toUpperCase();
-    const user = getCurrentUser();
 
-    if (user) {
-      // Already signed in (real or guest) — join directly
-      if (_isGuestUid(user.uid) || user.isAnonymous) {
-        _isAnonMode      = true;
-        _anonDisplayName = _getAnonDisplayName(user.uid);
-      }
-      if (mpJoinLoadingMsg) mpJoinLoadingMsg.textContent = `Joining room ${code}…`;
-      _showView('join-loading');
-      mpOverlay.classList.add('show');
-      _joinByCode(code);
-    } else {
+    // Wait for Firebase to restore any persisted session before deciding what to show.
+    // Without this, getCurrentUser() is always null on page load for signed-in users.
+    waitForAuthReady.then(() => {
+      const user = getCurrentUser();
+
+      if (user) {
+        // Already signed in (real or guest) — join directly
+        if (_isGuestUid(user.uid) || user.isAnonymous) {
+          _isAnonMode      = true;
+          _anonDisplayName = _getAnonDisplayName(user.uid);
+        }
+        if (mpJoinLoadingMsg) mpJoinLoadingMsg.textContent = `Joining room ${code}…`;
+        _showView('join-loading');
+        mpOverlay.classList.add('show');
+        _joinByCode(code);
+      } else {
       // Not signed in — show the guest join prompt inside the MP overlay
       const anonCodeEl = document.getElementById('mp-anon-join-code');
       if (anonCodeEl) anonCodeEl.textContent = code;
@@ -987,8 +1017,10 @@ async function _initMultiplayer() {
           }, 120_000);
         }, { once: true });
       }
-    }
-  }
+
+      } // end else (not signed in)
+    }); // end waitForAuthReady.then
+  } // end if (urlRoom)
 }
 
 function _esc(s) {
@@ -1020,10 +1052,12 @@ function _getOrCreateAnonId() {
 async function _signInAsGuest() {
   const uuid = _getOrCreateAnonId();
 
-  // Pre-assign a display name so the auth UI shows it immediately on sign-in
-  const idx  = Math.floor(Math.random() * ANON_NAMES.length);
-  const name = ANON_NAMES[idx];
-  localStorage.setItem('anon-display-name', name);
+  // Pre-compute the name from the UID the backend will assign (anon_<uuid[:36]>).
+  // This must happen BEFORE signInWithCustomToken so that onAuthStateChanged in
+  // auth.js reads the same name from localStorage that we pass to join-room.
+  const predictedUid = `anon_${uuid.slice(0, 36)}`;
+  const predictedName = _getAnonDisplayName(predictedUid);
+  localStorage.setItem('anon-display-name', predictedName);
 
   const API = (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
     ? 'http://127.0.0.1:8000' : location.origin;
@@ -1044,10 +1078,8 @@ async function _signInAsGuest() {
     await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
   const cred = await signInWithCustomToken(getAuth(), token);
 
-  // Finalize name from actual UID for cross-session consistency
-  const finalName = _getAnonDisplayName(cred.user.uid);
-  localStorage.setItem('anon-display-name', finalName);
-  return { user: cred.user, displayName: finalName };
+  // predictedName/predictedUid are already in localStorage before onAuthStateChanged fires
+  return { user: cred.user, displayName: predictedName };
 }
 
 /** Map a player UID to a consistent avatar color from the 12-color palette. */

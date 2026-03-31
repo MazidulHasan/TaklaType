@@ -681,37 +681,9 @@ body {
 /* ---------- Controls ---------- */
 .controls { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; }
 
-.btn-custom-race {
-  background:    color-mix(in srgb, var(--accent) 10%, var(--surface));
-  border:        2px solid color-mix(in srgb, var(--accent) 50%, transparent);
-  color:         var(--accent);
-  font-family:   'Courier New', Courier, monospace;
-  font-size:     0.9rem;
-  padding:       0.6rem 1.6rem;
-  border-radius: 10px;
-  cursor:        pointer;
-  box-shadow:
-    0 3px 0 0     color-mix(in srgb, var(--accent) 30%, transparent),
-    0 6px 16px -4px color-mix(in srgb, var(--accent) 18%, transparent);
-  transform:   translateY(0);
-  transition:  transform 0.12s ease, box-shadow 0.12s ease, background 0.15s;
-  animation:   custom-race-glow 3s ease-in-out infinite;
-}
 @keyframes custom-race-glow {
   0%, 100% { box-shadow: 0 3px 0 0 color-mix(in srgb, var(--accent) 30%, transparent), 0  6px 16px -4px color-mix(in srgb, var(--accent) 18%, transparent); }
   50%      { box-shadow: 0 3px 0 0 color-mix(in srgb, var(--accent) 38%, transparent), 0 10px 24px -4px color-mix(in srgb, var(--accent) 28%, transparent); }
-}
-.btn-custom-race:hover {
-  background:  color-mix(in srgb, var(--accent) 18%, var(--surface));
-  transform:   translateY(-2px);
-  box-shadow:  0 5px 0 0 color-mix(in srgb, var(--accent) 35%, transparent),
-               0 12px 28px -4px color-mix(in srgb, var(--accent) 30%, transparent);
-  animation:   none;
-}
-.btn-custom-race:active {
-  transform:  translateY(2px);
-  box-shadow: 0 1px 0 0 color-mix(in srgb, var(--accent) 25%, transparent);
-  animation:  none;
 }
 
 .btn-restart {
@@ -888,7 +860,22 @@ body {
   flex-direction: column;
   gap:           0.65rem;
 }
-.mp-custom-row { gap: 0.5rem; }
+.mp-custom-row {
+  gap:              0.5rem;
+  background:       linear-gradient(270deg,
+    color-mix(in srgb, var(--accent) 18%, var(--surface)),
+    var(--surface),
+    color-mix(in srgb, var(--accent) 12%, var(--surface)),
+    var(--surface));
+  background-size:  300% 100%;
+  animation:        custom-row-shimmer 3.5s ease infinite;
+  border-color:     color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+@keyframes custom-row-shimmer {
+  0%   { background-position: 0%   50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0%   50%; }
+}
 .mp-custom-toggle-row {
   display:     flex;
   align-items: center;
@@ -1811,29 +1798,183 @@ body {
    Guest / Anonymous Play  +  Language Toggle  (added feature set)
    ================================================================ */
 
-/* ---------- Guest Play button ---------- */
-.btn-anon-play {
-  background:    transparent;
-  border:        1.5px dashed var(--border);
-  color:         var(--muted);
+/* ---------- Multiplayer dropdown ---------- */
+.mp-dropdown-wrap {
+  position: relative;
+}
+
+.mp-dropdown-menu {
+  display:          none;
+  position:         absolute;
+  top:              calc(100% + 6px);
+  right:            0;
+  background:       var(--surface);
+  border:           1.5px solid var(--border);
+  border-radius:    12px;
+  padding:          6px;
+  z-index:          200;
+  min-width:        190px;
+  box-shadow:       0 8px 24px rgba(0,0,0,0.25);
+}
+.mp-dropdown-menu.open {
+  display:        block;
+  animation:      mp-menu-pop 0.18s cubic-bezier(0.34,1.56,0.64,1) both;
+  transform-origin: top right;
+}
+
+@keyframes mp-menu-pop {
+  from { opacity: 0; transform: scale(0.85) translateY(-6px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);    }
+}
+
+.mp-dropdown-trigger.clicked {
+  animation: mp-trigger-pop 0.22s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes mp-trigger-pop {
+  0%   { transform: scale(1);    }
+  40%  { transform: scale(0.88); }
+  100% { transform: scale(1);    }
+}
+
+.mp-dropdown-item {
+  display:        flex;
+  align-items:    center;
+  gap:            0.65rem;
+  width:          100%;
+  background:     transparent;
+  border:         none;
+  border-radius:  8px;
+  padding:        0.5rem 0.65rem;
+  cursor:         pointer;
+  color:          var(--text);
+  text-align:     left;
+  transition:     background 0.15s, color 0.15s;
+}
+.mp-dropdown-item:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color:      var(--accent);
+}
+.mp-dropdown-item svg {
+  flex-shrink: 0;
+  opacity:     0.75;
+}
+.mp-dropdown-item span {
+  display:        flex;
+  flex-direction: column;
+  gap:            1px;
+}
+.mp-dropdown-item strong {
+  font-size:   0.82rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.mp-dropdown-item small {
+  font-size:   0.7rem;
+  opacity:     0.6;
+  line-height: 1.2;
+}
+.mp-dropdown-item--guest  { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 0.6rem; }
+.mp-dropdown-item--custom { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 0.6rem; }
+.mp-dropdown-item:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ---------- Solo Custom Text button ---------- */
+.btn-solo-custom {
+  background:    color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border:        2px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  color:         var(--accent);
   font-family:   'Courier New', Courier, monospace;
-  font-size:     0.78rem;
-  padding:       0 0.85rem;
-  height:        38px;
+  font-size:     0.9rem;
+  padding:       0.5rem 1.1rem;
   border-radius: 10px;
   cursor:        pointer;
+  transition:    background 0.18s, transform 0.12s, box-shadow 0.18s;
+  animation:     custom-race-glow 2.4s ease-in-out infinite;
+}
+.btn-solo-custom:hover {
+  background:  color-mix(in srgb, var(--accent) 18%, var(--surface));
+  transform:   translateY(-2px);
+  box-shadow:  0 5px 0 0 color-mix(in srgb, var(--accent) 35%, transparent),
+               0 12px 28px -4px color-mix(in srgb, var(--accent) 30%, transparent);
+  animation:   none;
+}
+.btn-solo-custom:active { transform: translateY(2px); animation: none; }
+
+/* ---------- Solo Custom Text modal ---------- */
+.solo-custom-overlay {
+  position:        fixed;
+  inset:           0;
+  background:      rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+  z-index:         300;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  animation:       fadeIn 0.18s ease;
+}
+.solo-custom-modal {
+  background:    var(--surface);
+  border:        1.5px solid var(--border);
+  border-radius: 18px;
+  padding:       2rem 2rem 1.6rem;
+  width:         min(480px, 92vw);
+  position:      relative;
   display:       flex;
-  align-items:   center;
-  gap:           0.35rem;
-  transition:    border-color 0.18s, color 0.18s, background 0.18s, border-style 0.1s;
-  white-space:   nowrap;
+  flex-direction:column;
+  gap:           0.9rem;
+  box-shadow:    0 16px 48px rgba(0,0,0,0.35);
+  animation:     scaleIn 0.2s cubic-bezier(0.34,1.56,0.64,1);
 }
-.btn-anon-play:hover {
-  border-style:  solid;
-  border-color:  var(--accent);
-  color:         var(--accent);
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.88); }
+  to   { opacity: 1; transform: scale(1);    }
 }
-.btn-anon-play:disabled { opacity: 0.55; cursor: not-allowed; }
+.solo-custom-close {
+  position:   absolute;
+  top:        0.9rem;
+  right:      0.9rem;
+  background: transparent;
+  border:     none;
+  color:      var(--muted);
+  font-size:  1.1rem;
+  cursor:     pointer;
+  padding:    0.2rem 0.4rem;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.solo-custom-close:hover { color: var(--text); background: color-mix(in srgb, var(--text) 10%, transparent); }
+.solo-custom-title    { font-size: 1.15rem; font-weight: 700; margin: 0; }
+.solo-custom-subtitle { font-size: 0.82rem; color: var(--muted); margin: 0; }
+.solo-custom-textarea {
+  width:         100%;
+  background:    var(--bg);
+  border:        1.5px solid var(--border);
+  border-radius: 10px;
+  color:         var(--text);
+  font-family:   'Courier New', Courier, monospace;
+  font-size:     0.9rem;
+  padding:       0.75rem;
+  resize:        vertical;
+  min-height:    100px;
+  outline:       none;
+  box-sizing:    border-box;
+  transition:    border-color 0.18s;
+}
+.solo-custom-textarea:focus { border-color: var(--accent); }
+.btn-solo-custom-start {
+  background:    var(--accent);
+  color:         #fff;
+  border:        none;
+  border-radius: 10px;
+  padding:       0.65rem 1.4rem;
+  font-size:     0.95rem;
+  font-weight:   600;
+  cursor:        pointer;
+  align-self:    flex-end;
+  transition:    opacity 0.15s, transform 0.12s;
+}
+.btn-solo-custom-start:hover   { opacity: 0.88; transform: translateY(-1px); }
+.btn-solo-custom-start:active  { transform: translateY(1px); }
+.btn-solo-custom-start:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* Anonymous user indicator in user panel */
 .user-panel.is-anon-user {

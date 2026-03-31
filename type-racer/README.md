@@ -236,9 +236,10 @@ All endpoints requiring auth expect a Firebase ID token in the `Authorization: B
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/health` | Health check — `{"status": "running"}` |
-| `GET` | `/get-sentence?category=general` | Single random sentence |
-| `GET` | `/get-sentences?count=N&category=general` | N joined sentences |
+| `GET` | `/get-sentence?category=general&lang=bn` | Single random sentence |
+| `GET` | `/get-sentences?count=N&category=general&lang=bn` | N joined sentences (`lang=bn` or `lang=en`) |
 | `GET` | `/categories` | List available categories |
+| `POST` | `/anon/token` | Mint a Firebase custom token for guest play — send `X-Anon-Id: <uuid>` header, returns `{"token": "..."}`. No Anonymous Auth needed. |
 
 ### Auth required
 
@@ -246,11 +247,11 @@ All endpoints requiring auth expect a Firebase ID token in the `Authorization: B
 |---|---|---|
 | `POST` | `/save-result` | Save solo race result to Firestore |
 | `POST` | `/add-sentence` | Submit a sentence for admin review |
-| `POST` | `/create-room?count=N&category=X` | Create multiplayer room |
-| `POST` | `/join-room/{code}` | Join a waiting room |
+| `POST` | `/create-room?count=N&category=X&lang=bn&display_name=Name` | Create multiplayer room |
+| `POST` | `/join-room/{code}?display_name=Name` | Join a waiting room |
 | `POST` | `/start-race/{code}` | Host starts the race |
 | `POST` | `/finish-player/{code}` | Mark self as finished |
-| `POST` | `/reset-room/{code}?count=N&category=X` | Host resets for Play Again |
+| `POST` | `/reset-room/{code}?count=N&category=X&lang=bn` | Host resets for Play Again |
 | `DELETE` | `/leave-room/{code}` | Leave and clean up room |
 
 ### Admin only
@@ -289,7 +290,8 @@ type-racer/
 │   └── typing_utils.py           # WPM / accuracy helpers
 │
 ├── data/
-│   └── sentences.json            # All sentences by category + pending queue
+│   ├── sentences.json            # Banglish sentences by category + pending queue
+│   └── sentences_en.json         # English sentences — same 5 categories, 25 each
 │
 └── frontend/
     ├── index.html                # Single-page app shell

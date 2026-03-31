@@ -29,32 +29,60 @@
 
         <!-- Header action buttons -->
         <div class="header-actions">
-          <!-- Multiplayer button (requires sign-in) -->
-          <button class="header-icon-btn" id="mp-btn" title="Multiplayer (Sign-in required)">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-          </button>
-
-          <!-- Guest / Incognito Multiplayer button (no sign-in needed) -->
-          <button class="btn-anon-play" id="anon-play-btn" title="Multiplayer as Guest — no account needed">
-            <!-- Incognito hat + glasses icon -->
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M8 10V7a4 4 0 0 1 8 0v3"/>
-              <rect x="3" y="10" width="18" height="3" rx="1.5"/>
-              <circle cx="8.5" cy="17" r="2.5"/>
-              <circle cx="15.5" cy="17" r="2.5"/>
-              <path d="M11 17h2"/>
-              <path d="M6 17H3.5"/>
-              <path d="M18 17h2.5"/>
-            </svg>
-            Guest
-          </button>
+          <!-- Multiplayer dropdown trigger -->
+          <div class="mp-dropdown-wrap" id="mp-dropdown-wrap">
+            <button class="header-icon-btn mp-dropdown-trigger" id="mp-dropdown-trigger" title="Multiplayer">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </button>
+            <div class="mp-dropdown-menu" id="mp-dropdown-menu">
+              <!-- Option 1: signed-in multiplayer -->
+              <button class="mp-dropdown-item" id="mp-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                <span>
+                  <strong>Multiplayer</strong>
+                  <small>Sign in required</small>
+                </span>
+              </button>
+              <!-- Option 2: guest multiplayer -->
+              <button class="mp-dropdown-item mp-dropdown-item--guest" id="anon-play-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+                  <rect x="3" y="10" width="18" height="3" rx="1.5"/>
+                  <circle cx="8.5" cy="17" r="2.5"/>
+                  <circle cx="15.5" cy="17" r="2.5"/>
+                  <path d="M11 17h2"/><path d="M6 17H3.5"/><path d="M18 17h2.5"/>
+                </svg>
+                <span>
+                  <strong>Play as Guest</strong>
+                  <small>No account needed</small>
+                </span>
+              </button>
+              <!-- Option 3: custom text multiplayer -->
+              <button class="mp-dropdown-item mp-dropdown-item--custom" id="btn-custom-race">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
+                <span>
+                  <strong>Custom Text</strong>
+                  <small>Race on your own text</small>
+                </span>
+              </button>
+            </div>
+          </div>
 
           <!-- Leaderboard toggle -->
           <button class="header-icon-btn" id="leaderboard-toggle" title="Leaderboard">
@@ -254,7 +282,19 @@
     <!-- Controls -->
     <div class="controls">
       <button class="btn-restart" id="btn-restart">↺ New Race</button>
-      <button class="btn-custom-race" id="btn-custom-race" title="Race on your own sentence">✏ Custom Race</button>
+      <button class="btn-solo-custom" id="btn-solo-custom" title="Type your own custom text — solo only">✏ Custom Text</button>
+    </div>
+
+    <!-- Solo custom text modal -->
+    <div class="solo-custom-overlay" id="solo-custom-overlay" style="display:none" aria-modal="true" role="dialog">
+      <div class="solo-custom-modal">
+        <button class="solo-custom-close" id="solo-custom-close" aria-label="Close">✕</button>
+        <h3 class="solo-custom-title">Custom Text</h3>
+        <p class="solo-custom-subtitle">Type anything — then race it solo</p>
+        <textarea id="solo-custom-textarea" class="solo-custom-textarea"
+          placeholder="Paste or type your custom text here…" rows="5" spellcheck="false"></textarea>
+        <button class="btn-solo-custom-start" id="btn-solo-custom-start">▶ Start Race</button>
+      </div>
     </div>
 
     <!-- Solo result loading overlay (shown between confetti and result modal) -->
