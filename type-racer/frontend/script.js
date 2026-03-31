@@ -62,7 +62,7 @@ let startTime          = null;
 let elapsedSeconds     = 0;
 let totalErrors        = 0;
 let finished           = false;
-let selectedLines      = 1;
+let selectedLines      = 3;
 let selectedCategory   = 'general';
 let selectedLang       = localStorage.getItem('taklatype-lang') || 'bn';
 let keyErrors          = {}; // char → error count
@@ -105,6 +105,7 @@ function applySettings() {
 
   const sizeMap = { small: '1rem', medium: '1.25rem', large: '1.55rem' };
   sentenceDisplay.style.fontSize = sizeMap[settings.fontSize] || '1.25rem';
+  requestAnimationFrame(setContainerHeight);
   document.querySelectorAll('.option-pill[data-font]').forEach(p => {
     p.classList.toggle('active', p.dataset.font === settings.fontSize);
   });
@@ -285,6 +286,9 @@ function initRound() {
 
   progressBar.style.width = '0%';
   sentenceContainer.classList.remove('shake');
+  document.body.classList.remove('typing-active');
+  sentenceContainer.scrollTop = 0;
+  sentenceDisplay.style.transform = '';
   focusInput();
 }
 
@@ -330,13 +334,50 @@ function setCharState(index, state) {
   span.className  = `char ${state}${hasCursor ? ' cursor' : ''}${dotCls}`;
 }
 
+// ─── Monkeytype-style line scroll ─────────────────────────────────────────────
+function _lineH() {
+  return parseFloat(getComputedStyle(sentenceDisplay).lineHeight) || 32;
+}
+
+function setContainerHeight() {
+  const lineH     = _lineH();
+  const padT      = parseFloat(getComputedStyle(sentenceContainer).paddingTop)    || 0;
+  const padB      = parseFloat(getComputedStyle(sentenceContainer).paddingBottom)  || 0;
+  const threeLines = Math.ceil(3 * lineH + padT + padB);
+
+  // Always enforce minimum = 3 lines (resize handle reads this from computedStyle)
+  sentenceContainer.style.minHeight = threeLines + 'px';
+
+  // Only set the height if the user has no saved custom height
+  if (!localStorage.getItem('tt-sentence-height')) {
+    sentenceContainer.style.height = threeLines + 'px';
+  }
+}
+
+function syncLineScroll() {
+  const spans = getCharSpans();
+  const idx   = Math.min(cursorIndex, targetSentence.length - 1);
+  const cursorSpan = spans[idx];
+  if (!cursorSpan) return;
+
+  const lineH = _lineH();
+  const padT  = parseFloat(getComputedStyle(sentenceContainer).paddingTop) || 0;
+
+  // offsetTop is layout-based (not affected by scrollTop), relative to sentence-container
+  const absoluteLine = Math.floor((cursorSpan.offsetTop - padT) / lineH);
+
+  // Keep cursor on the 2nd visible line: scrollTop = (line - 1) * lineH
+  if (absoluteLine >= 2) {
+    sentenceContainer.scrollTop = (absoluteLine - 1) * lineH;
+  }
+}
+
 function moveCursor(from, to) {
   const spans = getCharSpans();
   spans[from]?.classList.remove('cursor');
   if (to < targetSentence.length) {
-    const next = spans[to];
-    next?.classList.add('cursor');
-    next?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    spans[to]?.classList.add('cursor');
+    syncLineScroll();
   }
 }
 
@@ -505,7 +546,10 @@ function handleBackspace() {
 
 function handleCharInput(char) {
   if (cursorIndex >= targetSentence.length) return;
-  if (!startTime) startTimer();
+  if (!startTime) {
+    startTimer();
+    document.body.classList.add('typing-active');
+  }
 
   const idx       = cursorIndex;
   const isCorrect = char === targetSentence[idx];
@@ -565,6 +609,7 @@ function updateProgress() {
 async function finishRound() {
   stopTimer();
   finished = true;
+  document.body.classList.remove('typing-active');
 
   const correct = typedChars.filter(s => s === 'correct').length;
   const wpm     = calcWpm(correct, elapsedSeconds);
@@ -634,6 +679,7 @@ function hideResult() {
 resultOverlay.addEventListener('click', e => { if (e.target === resultOverlay) fetchSentence(); });
 btnRestart.addEventListener('click',       () => fetchSentence());
 btnModalRestart.addEventListener('click',  () => fetchSentence());
+document.getElementById('btn-give-up').addEventListener('click', () => fetchSentence());
 
 // ─── Solo Custom Text ─────────────────────────────────────────────────────────
 (function () {

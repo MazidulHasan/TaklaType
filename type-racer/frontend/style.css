@@ -530,8 +530,8 @@ body {
   background:    var(--surface);
   border:        2px solid var(--border);
   border-radius: 12px;
-  padding:       1.4rem 2rem;
-  height:        160px;
+  padding:       1.4rem 2rem 2rem;
+  height:        auto;
   min-height:    80px;
   max-height:    70vh;
   overflow-y:    auto;
@@ -579,7 +579,6 @@ body {
   align-items:    center;
   justify-content: center;
   background:     rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(2px);
   color:          var(--muted);
   font-size:      0.8rem;
   letter-spacing: 2px;
@@ -610,8 +609,58 @@ body {
   word-break:  break-word;
   user-select: none;
   width:       100%;
+  transition:  filter 0.25s ease;
+}
+/* Blur the full text (including scrolled-off content) when not focused */
+.sentence-container:not(.is-focused):not(.hide-hint) .sentence-display {
+  filter: blur(3px);
 }
 .loading-text { color: var(--muted); font-size: 1rem; }
+
+/* ---------- Typing-active: dim non-essential UI ---------- */
+.lang-toggle-bar,
+.line-selector,
+.btn-restart,
+.btn-solo-custom {
+  transition: opacity 0.4s ease, filter 0.4s ease;
+}
+body.typing-active .lang-toggle-bar,
+body.typing-active .line-selector,
+body.typing-active .controls .btn-restart,
+body.typing-active .controls .btn-solo-custom {
+  opacity:        0.1;
+  filter:         blur(2px);
+  pointer-events: none;
+}
+
+/* Give Up — shown only while typing, sits alongside the other controls */
+@keyframes give-up-shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-4px) rotate(-1deg); }
+  40%      { transform: translateX(4px)  rotate(1deg); }
+  60%      { transform: translateX(-3px) rotate(-0.5deg); }
+  80%      { transform: translateX(3px)  rotate(0.5deg); }
+}
+.btn-give-up {
+  display:        none;
+  background:     transparent;
+  border:         2px solid var(--muted);
+  color:          var(--muted);
+  font-family:    'Courier New', Courier, monospace;
+  font-size:      0.9rem;
+  padding:        0.45rem 1.1rem;
+  border-radius:  10px;
+  cursor:         pointer;
+  letter-spacing: 1px;
+  transition:     background 0.2s, color 0.2s, border-color 0.2s;
+}
+.btn-give-up:hover {
+  background:   color-mix(in srgb, var(--wrong) 12%, transparent);
+  border-color: var(--wrong);
+  color:        var(--wrong);
+  animation:    give-up-shake 0.4s ease;
+}
+body.typing-active .btn-give-up { display: inline-block; }
 
 /* ---------- Characters ---------- */
 .word {
