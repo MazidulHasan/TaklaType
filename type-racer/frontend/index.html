@@ -24,7 +24,7 @@
       <div class="header-top">
         <div>
           <h1 class="logo"><span class="logo-text" id="logo-text"></span></h1>
-          <p class="subtitle">Banglish Office Type Racer</p>
+          <p class="subtitle">Murad Takla is judging your spelling</p>
         </div>
 
         <!-- Header action buttons -->
@@ -142,7 +142,7 @@
                   <span class="theme-dot" style="background:#ff7043"></span>Sunset
                 </button>
                 <button class="theme-option" data-theme="light">
-                  <span class="theme-dot" style="background:#c9880a"></span>Light
+                  <span class="theme-dot" style="background:#f5ecd4;border:1.5px solid #c9880a"></span>Light
                 </button>
               </div>
 
@@ -247,6 +247,26 @@
         <button class="pill" data-solocat="motivation">Motivation</button>
         <button class="pill" data-solocat="love">Love</button>
       </div>
+      <div class="modifier-dropdown-wrap" id="modifier-dropdown-wrap" style="margin-left:0.5rem">
+        <button class="modifier-trigger-btn" id="modifier-trigger-btn" title="Difficulty modifiers">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+            <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+            <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/>
+            <line x1="17" y1="16" x2="23" y2="16"/>
+          </svg>
+        </button>
+        <div class="modifier-dropdown" id="modifier-dropdown">
+          <p class="modifier-dropdown-label">Difficulty</p>
+          <div class="modifier-dropdown-pills">
+            <button class="pill" data-modifier="numbers" title="Insert numbers">123</button>
+            <button class="pill" data-modifier="symbols"  title="Insert symbols">!@#</button>
+            <button class="pill" data-modifier="mixed"    title="Mixed case">Aa</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Sentence Display -->
@@ -275,7 +295,8 @@
         <p>Processing results…</p>
       </div>
       <div class="mp-finished-notice" id="mp-finished-notice" style="display:none">
-        ✓ You finished! Waiting for others…
+        <div class="mp-finished-spinner"></div>
+        <span>✓ You finished! Waiting for others…</span>
       </div>
     </div>
 
@@ -294,6 +315,7 @@
         <p class="solo-custom-subtitle">Type anything — then race it solo</p>
         <textarea id="solo-custom-textarea" class="solo-custom-textarea"
           placeholder="Paste or type your custom text here…" rows="5" spellcheck="false"></textarea>
+        <p class="solo-custom-error" id="solo-custom-error" style="display:none"></p>
         <button class="btn-solo-custom-start" id="btn-solo-custom-start">▶ Start Race</button>
       </div>
     </div>
@@ -389,6 +411,14 @@
               <button class="mp-line-pill" data-rematch-cat="love">Love</button>
             </div>
           </div>
+          <div class="mp-lines-row">
+            <span class="mp-lines-label">Difficulty</span>
+            <div class="mp-lines-pills" id="mp-rematch-modifier-pills">
+              <button class="mp-line-pill" data-rematch-modifier="numbers" title="Insert numbers">123</button>
+              <button class="mp-line-pill" data-rematch-modifier="symbols"  title="Insert symbols">!@#</button>
+              <button class="mp-line-pill" data-rematch-modifier="mixed"    title="Mixed case">Aa</button>
+            </div>
+          </div>
         </div>
         <div class="mp-section-box mp-custom-row">
           <label class="mp-custom-toggle-row">
@@ -447,6 +477,14 @@
               <button class="mp-line-pill" data-mpcat="food">Food</button>
               <button class="mp-line-pill" data-mpcat="motivation">Motivation</button>
               <button class="mp-line-pill" data-mpcat="love">Love</button>
+            </div>
+          </div>
+          <div class="mp-lines-row">
+            <span class="mp-lines-label">Difficulty</span>
+            <div class="mp-lines-pills" id="mp-modifier-pills">
+              <button class="mp-line-pill" data-mpmodifier="numbers" title="Insert numbers">123</button>
+              <button class="mp-line-pill" data-mpmodifier="symbols"  title="Insert symbols">!@#</button>
+              <button class="mp-line-pill" data-mpmodifier="mixed"    title="Mixed case">Aa</button>
             </div>
           </div>
         </div>

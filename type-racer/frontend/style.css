@@ -425,7 +425,7 @@ body {
 .theme-option:hover  { background: var(--surface2); }
 .theme-option.active { border-color: var(--accent); color: var(--accent); }
 
-.theme-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.theme-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; box-sizing: border-box; }
 
 /* Font-size / option pills inside settings */
 .option-pill {
@@ -501,12 +501,62 @@ body {
 
 /* ---------- Progress Bar ---------- */
 .progress-container { height: 5px; background: var(--surface2); border-radius: 999px; overflow: hidden; }
-.progress-bar       { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, white)); border-radius: 999px; transition: width 0.1s ease; }
+.progress-bar       { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, white)); border-radius: 999px; transition: width 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
 
 /* ---------- Line Selector ---------- */
 .line-selector       { display: flex; align-items: center; gap: 0.8rem; }
 .line-selector-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; flex-shrink: 0; }
 .line-selector-pills { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+/* Difficulty modifier dropdown */
+.modifier-dropdown-wrap {
+  position: relative;
+}
+.modifier-trigger-btn {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  background:      transparent;
+  border:          1.5px solid var(--border);
+  border-radius:   8px;
+  padding:         0.27rem 0.5rem;
+  cursor:          pointer;
+  color:           var(--muted);
+  line-height:     1;
+  transition:      border-color 0.15s, color 0.15s, background 0.15s;
+}
+.modifier-trigger-btn:hover,
+.modifier-trigger-btn.has-active {
+  border-color: var(--accent);
+  color:        var(--accent);
+  background:   color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.modifier-trigger-btn.clicked {
+  animation: mp-trigger-pop 0.22s cubic-bezier(0.34,1.56,0.64,1);
+}
+.modifier-dropdown {
+  position:      absolute;
+  bottom:        calc(100% + 8px);
+  left:          0;
+  background:    var(--surface);
+  border:        1.5px solid var(--border);
+  border-radius: 10px;
+  padding:       0.6rem 0.75rem;
+  display:       none;
+  z-index:       300;
+  white-space:   nowrap;
+  box-shadow:    0 4px 20px rgba(0,0,0,0.28);
+  min-width:     130px;
+}
+.modifier-dropdown.open { display: block; }
+.modifier-dropdown-label {
+  font-size:      0.62rem;
+  color:          var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin:         0 0 0.45rem;
+}
+.modifier-dropdown-pills { display: flex; gap: 0.4rem; }
 
 .pill {
   background:    transparent;
@@ -1405,13 +1455,25 @@ body.typing-active .btn-give-up { display: inline-block; }
 }
 
 .mp-finished-notice {
-  text-align:  center;
-  font-size:   0.82rem;
-  color:       var(--correct);
-  font-weight: 600;
-  padding:     0.4rem 0 0.1rem;
-  border-top:  1px solid var(--border);
-  margin-top:  0.2rem;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  gap:             0.5rem;
+  font-size:       0.82rem;
+  color:           var(--correct);
+  font-weight:     600;
+  padding:         0.4rem 0 0.1rem;
+  border-top:      1px solid var(--border);
+  margin-top:      0.2rem;
+}
+.mp-finished-spinner {
+  width:         14px;
+  height:        14px;
+  border:        2px solid color-mix(in srgb, var(--correct) 30%, transparent);
+  border-top:    2px solid var(--correct);
+  border-radius: 50%;
+  animation:     mp-spin 0.9s linear infinite;
+  flex-shrink:   0;
 }
 .btn-mp-quit-race {
   background:    color-mix(in srgb, var(--wrong) 8%, transparent);
@@ -1492,7 +1554,7 @@ body.typing-active .btn-give-up { display: inline-block; }
   height:        100%;
   background:    linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, white));
   border-radius: 999px;
-  transition:    width 0.3s ease;
+  transition:    width 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 .mp-bar-wpm   { min-width: 70px; text-align: right; color: var(--correct); font-weight: 700; }
 .mp-bar-rank  { color: var(--accent); font-size: 0.75rem; margin-left: 0.3rem; }
@@ -2024,6 +2086,12 @@ body.typing-active .btn-give-up { display: inline-block; }
 .btn-solo-custom-start:hover   { opacity: 0.88; transform: translateY(-1px); }
 .btn-solo-custom-start:active  { transform: translateY(1px); }
 .btn-solo-custom-start:disabled { opacity: 0.45; cursor: not-allowed; }
+.solo-custom-error {
+  color:       var(--wrong);
+  font-size:   0.82rem;
+  margin:      0;
+  align-self:  flex-start;
+}
 
 /* Anonymous user indicator in user panel */
 .user-panel.is-anon-user {

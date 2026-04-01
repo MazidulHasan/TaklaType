@@ -17,8 +17,11 @@ window.__tt = {
     }
   },
   startRound(sentence) {
-    targetSentence     = sentence;
-    sentencesArray     = [sentence];
+    // Capitalize first letter of each sentence segment
+    targetSentence = sentence.split('. ').map(
+      s => (s && s.length > 0) ? s.charAt(0).toUpperCase() + s.slice(1) : s
+    ).join('. ');
+    sentencesArray = [targetSentence];
     sentenceBoundaries = new Set();
     initRound();
   },
@@ -57,6 +60,7 @@ let sentencesArray     = [];
 let sentenceBoundaries = new Set();
 let typedChars         = [];
 let cursorIndex        = 0;
+let selectedModifiers  = new Set();
 let timerInterval      = null;
 let startTime          = null;
 let elapsedSeconds     = 0;
@@ -206,6 +210,73 @@ document.querySelectorAll('.pill[data-solocat]').forEach(btn => {
   });
 });
 
+// ─── Difficulty Modifiers ─────────────────────────────────────────────────────
+(function initModifierDropdown() {
+  const trigger  = document.getElementById('modifier-trigger-btn');
+  const dropdown = document.getElementById('modifier-dropdown');
+  if (!trigger || !dropdown) return;
+
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
+    // Scale-pop animation matching the MP dropdown trigger
+    trigger.classList.remove('clicked');
+    void trigger.offsetWidth; // reflow to restart animation
+    trigger.classList.add('clicked');
+    trigger.addEventListener('animationend', () => trigger.classList.remove('clicked'), { once: true });
+    dropdown.classList.toggle('open');
+  });
+  // Keep dropdown open when clicking inside it
+  dropdown.addEventListener('click', e => e.stopPropagation());
+  // Close on outside click
+  document.addEventListener('click', () => dropdown.classList.remove('open'));
+})();
+
+function _updateModifierTrigger() {
+  const trigger = document.getElementById('modifier-trigger-btn');
+  if (trigger) trigger.classList.toggle('has-active', selectedModifiers.size > 0);
+}
+
+document.querySelectorAll('#modifier-dropdown-wrap .pill[data-modifier]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mod = btn.dataset.modifier;
+    if (selectedModifiers.has(mod)) { selectedModifiers.delete(mod); btn.classList.remove('active'); }
+    else                            { selectedModifiers.add(mod);    btn.classList.add('active');    }
+    _updateModifierTrigger();
+    fetchSentence();
+  });
+});
+
+function applyModifiers(text, mods) {
+  if (!mods || mods.size === 0) return text;
+  const NUMS = ['0','1','2','3','4','5','6','7','8','9'];
+  const SYMS = ['@','#','$','%','&','!','?','*','+','='];
+  const pool = [
+    ...(mods.has('numbers') ? NUMS : []),
+    ...(mods.has('symbols') ? SYMS : []),
+  ];
+
+  let words = text.split(' ');
+  if (pool.length > 0) {
+    const out = [];
+    for (let i = 0; i < words.length; i++) {
+      out.push(words[i]);
+      if (i < words.length - 1 && Math.random() < 0.22) {
+        out.push(pool[Math.floor(Math.random() * pool.length)]);
+      }
+    }
+    words = out;
+  }
+
+  let result = words.join(' ');
+  if (mods.has('mixed')) {
+    result = result.split('').map((c, i) => {
+      if (i === 0) return c; // preserve leading capital
+      return (/[a-z]/.test(c) && Math.random() < 0.18) ? c.toUpperCase() : c;
+    }).join('');
+  }
+  return result;
+}
+
 // ─── Language Toggle ──────────────────────────────────────────────────────────
 // Apply saved lang on load
 document.querySelectorAll('#solo-lang-pills .lang-pill').forEach(btn => {
@@ -247,15 +318,21 @@ async function fetchSentence() {
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
-    sentencesArray = data.sentences || [data.sentence];
-    targetSentence = sentencesArray.join('. ');
+    // Capitalize the first letter of each sentence
+    sentencesArray = (data.sentences || [data.sentence]).map(
+      s => (s && s.length > 0) ? s.charAt(0).toUpperCase() + s.slice(1) : s
+    );
+    targetSentence = applyModifiers(sentencesArray.join('. '), selectedModifiers);
 
+    // Boundaries are only valid on the unmodified sentence; clear them when modifiers shift positions
     sentenceBoundaries = new Set();
-    let pos = 0;
-    for (let i = 0; i < sentencesArray.length - 1; i++) {
-      pos += sentencesArray[i].length;
-      sentenceBoundaries.add(pos);
-      pos += 2;
+    if (selectedModifiers.size === 0) {
+      let pos = 0;
+      for (let i = 0; i < sentencesArray.length - 1; i++) {
+        pos += sentencesArray[i].length;
+        sentenceBoundaries.add(pos);
+        pos += 2;
+      }
     }
 
     initRound();
@@ -522,7 +599,14 @@ function clearConfetti() {
 
 // ─── Input handling ───────────────────────────────────────────────────────────
 typingInput.addEventListener('keydown', e => {
-  if (finished) return;
+  if (finished) {
+    // Enter to play again when result modal is visible
+    if (e.key === 'Enter' && resultOverlay.classList.contains('show')) {
+      e.preventDefault();
+      fetchSentence();
+    }
+    return;
+  }
   if (['Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
     e.preventDefault(); return;
   }
@@ -681,6 +765,22 @@ btnRestart.addEventListener('click',       () => fetchSentence());
 btnModalRestart.addEventListener('click',  () => fetchSentence());
 document.getElementById('btn-give-up').addEventListener('click', () => fetchSentence());
 
+// ─── Global keyboard shortcuts ─────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  // Escape closes the solo result modal
+  if (e.key === 'Escape' && resultOverlay.classList.contains('show')) {
+    e.preventDefault();
+    fetchSentence();
+    return;
+  }
+  // Enter plays again when result is open and typing input isn't focused
+  if (e.key === 'Enter' && resultOverlay.classList.contains('show') &&
+      document.activeElement !== typingInput) {
+    e.preventDefault();
+    fetchSentence();
+  }
+});
+
 // ─── Solo Custom Text ─────────────────────────────────────────────────────────
 (function () {
   const btnSoloCustom   = document.getElementById('btn-solo-custom');
@@ -688,6 +788,7 @@ document.getElementById('btn-give-up').addEventListener('click', () => fetchSent
   const closeBtn        = document.getElementById('solo-custom-close');
   const textarea        = document.getElementById('solo-custom-textarea');
   const startBtn        = document.getElementById('btn-solo-custom-start');
+  const errorEl         = document.getElementById('solo-custom-error');
   if (!btnSoloCustom || !overlay) return;
 
   function openModal() {
@@ -696,6 +797,7 @@ document.getElementById('btn-give-up').addEventListener('click', () => fetchSent
   }
   function closeModal() {
     overlay.style.display = 'none';
+    if (errorEl) errorEl.style.display = 'none';
   }
 
   btnSoloCustom.addEventListener('click', openModal);
@@ -703,8 +805,22 @@ document.getElementById('btn-give-up').addEventListener('click', () => fetchSent
   overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 
   startBtn.addEventListener('click', () => {
-    const text = textarea.value.trim();
-    if (!text) { textarea.focus(); return; }
+    const raw  = textarea.value.trim();
+    if (!raw) { textarea.focus(); return; }
+    const words = raw.split(/\s+/).length;
+    if (words < 15) {
+      if (errorEl) { errorEl.textContent = 'Please enter at least 15 words.'; errorEl.style.display = ''; }
+      textarea.focus();
+      return;
+    }
+    if (raw.length > 500) {
+      if (errorEl) { errorEl.textContent = 'Maximum 500 characters allowed.'; errorEl.style.display = ''; }
+      textarea.focus();
+      return;
+    }
+    if (errorEl) errorEl.style.display = 'none';
+    // Auto-capitalize first letter
+    const text = raw.charAt(0).toUpperCase() + raw.slice(1);
     closeModal();
     // Bypass API fetch — set sentence directly and start the round
     sentencesArray   = [text];
@@ -804,6 +920,28 @@ export function trapFocus(modalEl) {
   handle.addEventListener('touchstart',  e => { e.preventDefault(); onStart(e.touches[0].clientY); }, { passive: false });
   document.addEventListener('touchmove', e => { if (dragging) { e.preventDefault(); onMove(e.touches[0].clientY); } }, { passive: false });
   document.addEventListener('touchend',  onEnd);
+})();
+
+// ─── Logo click — return to main page ────────────────────────────────────────
+(function initLogoNav() {
+  const logoEl = document.querySelector('.logo');
+  if (!logoEl) return;
+  logoEl.style.cursor = 'pointer';
+  logoEl.title = 'Go to main page';
+  logoEl.addEventListener('click', () => {
+    const inActiveRace  = startTime !== null && !finished;
+    const inMultiplayer = window.__tt?.inMultiplayer;
+    const mpOverlayOpen = document.getElementById('mp-overlay')?.classList.contains('show');
+    const mpResultOpen  = document.getElementById('mp-result-panel')?.classList.contains('show');
+    const resultOpen    = resultOverlay.classList.contains('show');
+
+    const needsConfirm = inActiveRace || inMultiplayer || mpOverlayOpen || mpResultOpen;
+    if (needsConfirm) {
+      if (!confirm('Leave the current race and return to the main page?')) return;
+    }
+    // Reload without URL params to fully reset all state
+    window.location.href = window.location.pathname;
+  });
 })();
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────

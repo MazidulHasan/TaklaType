@@ -27,15 +27,17 @@ if (!isConfigured) {
     const q = query(
       collection(db, 'leaderboard'),
       orderBy('wpm', 'desc'),
-      limit(10),
+      limit(20),
     );
 
     _unsub = onSnapshot(q, snap => {
-      if (snap.empty) {
+      // Filter out anonymous/guest users (UID starts with "anon_"), keep top 5
+      const docs = snap.docs.filter(doc => !doc.id.startsWith('anon_')).slice(0, 5);
+      if (docs.length === 0) {
         lbList.innerHTML = '<li class="lb-empty">No scores yet – be the first!</li>';
         return;
       }
-      lbList.innerHTML = snap.docs.map((doc, i) => {
+      lbList.innerHTML = docs.map((doc, i) => {
         const d    = doc.data();
         const rank = i === 0 ? '1st' : i === 1 ? '2nd' : i === 2 ? '3rd' : `${i + 1}th`;
         return `<li class="lb-row">

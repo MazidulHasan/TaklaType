@@ -182,6 +182,9 @@ async function _initMultiplayer() {
   // Language selection (synced with solo mode via localStorage)
   let _selectedLang  = localStorage.getItem('taklatype-lang') || 'bn';
   let _rematchLang   = _selectedLang;
+  // Difficulty modifiers
+  let _mpModifiers      = new Set();
+  let _rematchModifiers = new Set();
 
   // ── Custom sentence toggle ───────────────────────────────────────────────────
   const mpLobbySelectors = document.getElementById('mp-lobby-selectors');
@@ -235,6 +238,52 @@ async function _initMultiplayer() {
     });
   }
 
+  // ── Difficulty modifier helpers ──────────────────────────────────────────────
+  function _applyMpModifiers(text, mods) {
+    if (!mods || mods.size === 0) return text;
+    const NUMS = ['0','1','2','3','4','5','6','7','8','9'];
+    const SYMS = ['@','#','$','%','&','!','?','*','+','='];
+    const pool = [
+      ...(mods.has('numbers') ? NUMS : []),
+      ...(mods.has('symbols') ? SYMS : []),
+    ];
+    let words = text.split(' ');
+    if (pool.length > 0) {
+      const out = [];
+      for (let i = 0; i < words.length; i++) {
+        out.push(words[i]);
+        if (i < words.length - 1 && Math.random() < 0.22) {
+          out.push(pool[Math.floor(Math.random() * pool.length)]);
+        }
+      }
+      words = out;
+    }
+    let result = words.join(' ');
+    if (mods.has('mixed')) {
+      result = result.split('').map((c, i) => {
+        if (i === 0) return c;
+        return (/[a-z]/.test(c) && Math.random() < 0.18) ? c.toUpperCase() : c;
+      }).join('');
+    }
+    return result;
+  }
+
+  // Modifier pill handlers — multi-select toggles
+  document.querySelectorAll('#mp-modifier-pills .mp-line-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const mod = pill.dataset.mpmodifier;
+      if (_mpModifiers.has(mod)) { _mpModifiers.delete(mod); pill.classList.remove('active'); }
+      else                       { _mpModifiers.add(mod);    pill.classList.add('active');    }
+    });
+  });
+  document.querySelectorAll('#mp-rematch-modifier-pills .mp-line-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const mod = pill.dataset.rematchModifier;
+      if (_rematchModifiers.has(mod)) { _rematchModifiers.delete(mod); pill.classList.remove('active'); }
+      else                            { _rematchModifiers.add(mod);    pill.classList.add('active');    }
+    });
+  });
+
   // ── Open/close lobby modal ──────────────────────────────────────────────────
   mpBtn.addEventListener('click', () => {
     const user = getCurrentUser();
@@ -261,6 +310,16 @@ async function _initMultiplayer() {
 
   function _closeModal() {
     mpOverlay.classList.remove('show');
+    // Reset custom sentence toggle so it doesn't persist across modal opens
+    _useCustomSentence = false;
+    if (mpCustomToggle)   mpCustomToggle.classList.remove('active');
+    if (mpCustomInput)    { mpCustomInput.style.display = 'none'; mpCustomInput.value = ''; }
+    if (mpCustomSaveRow)  mpCustomSaveRow.style.display = 'none';
+    if (mpLobbySelectors) mpLobbySelectors.style.display = '';
+    if (mpError)          mpError.textContent = '';
+    // Reset modifier pills
+    _mpModifiers.clear();
+    document.querySelectorAll('#mp-modifier-pills .mp-line-pill').forEach(p => p.classList.remove('active'));
   }
 
   // ── View switcher ───────────────────────────────────────────────────────────
@@ -318,7 +377,30 @@ async function _initMultiplayer() {
     mpCreateBtn.textContent = 'Creating…';
     try {
       const token      = await getIdToken();
-      const customText = _useCustomSentence ? (mpCustomInput?.value.trim() || '') : '';
+      const rawCustom  = _useCustomSentence ? (mpCustomInput?.value.trim() || '') : '';
+      if (rawCustom) {
+        const words = rawCustom.split(/\s+/).length;
+        if (words < 15) {
+          mpError.textContent = 'Custom sentence must have at least 15 words.';
+          return;
+        }
+        if (rawCustom.length > 500) {
+          mpError.textContent = 'Custom sentence must be under 500 characters.';
+          return;
+        }
+      }
+      // Auto-capitalize first letter
+      let customText = rawCustom ? rawCustom.charAt(0).toUpperCase() + rawCustom.slice(1) : '';
+      // If no custom text but modifiers active: fetch sentence, apply modifiers, use as custom
+      if (!customText && _mpModifiers.size > 0) {
+        const sRes = await fetch(
+          `${API_BASE}/get-sentences?count=${_selectedLines}&category=${_selectedCategory}&lang=${_selectedLang}`
+        );
+        const sData = await sRes.json();
+        const joined = (sData.sentences || [sData.sentence])
+          .map(s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s).join('. ');
+        customText = _applyMpModifiers(joined, _mpModifiers);
+      }
       const nameParam  = _anonDisplayName ? `&display_name=${encodeURIComponent(_anonDisplayName)}` : '';
       const resp  = await fetch(
         `${API_BASE}/create-room?count=${_selectedLines}&category=${_selectedCategory}&lang=${_selectedLang}${nameParam}`,
@@ -569,15 +651,18 @@ async function _initMultiplayer() {
     if (mpRaceContent)    mpRaceContent.style.display    = '';
     if (mpProcessing)     mpProcessing.style.display     = 'none';
     if (mpFinishedNotice) mpFinishedNotice.style.display = 'none';
+    if (mpQuitRaceBtn)    mpQuitRaceBtn.style.display    = '';
     _selfFinished = false;
     _raceStartMs  = Date.now();
-    // Hide solo controls during multiplayer race
-    const langBar  = document.querySelector('.lang-toggle-bar');
-    const lineSel  = document.querySelector('.line-selector');
-    const controls = document.querySelector('.controls');
-    if (langBar)  langBar.style.display  = 'none';
-    if (lineSel)  lineSel.style.display  = 'none';
-    if (controls) controls.style.display = 'none';
+    // Hide solo controls + top progress bar during multiplayer race
+    const langBar    = document.querySelector('.lang-toggle-bar');
+    const lineSel    = document.querySelector('.line-selector');
+    const controls   = document.querySelector('.controls');
+    const progressCt = document.querySelector('.progress-container');
+    if (langBar)    langBar.style.display    = 'none';
+    if (lineSel)    lineSel.style.display    = 'none';
+    if (controls)   controls.style.display   = 'none';
+    if (progressCt) progressCt.style.display = 'none';
     if (window.__tt) {
       window.__tt.setMultiplayer(true);
       window.__tt.startRound(sentence);
@@ -649,7 +734,7 @@ async function _initMultiplayer() {
     const user = getCurrentUser();
     playerBars.innerHTML = Object.entries(players).map(([uid, p]) => {
       const you    = uid === user?.uid ? ' (you)' : '';
-      const pct    = Math.min(p.progress || 0, 100);
+      const pct    = p.finished ? 100 : Math.min(p.progress || 0, 100);
       const finTag = p.finished ? ` <span class="mp-bar-rank">#${p.rank}</span>` : '';
       const color  = _uidToColor(uid);
       const avatar = p.photoURL
@@ -686,9 +771,9 @@ async function _initMultiplayer() {
     if (!roomCode || !_raceStarted || _selfFinished) return;
     _selfFinished = true;
 
-    // Hide race content, show processing spinner
-    if (mpRaceContent)    mpRaceContent.style.display    = 'none';
-    if (mpProcessing)     mpProcessing.style.display     = '';
+    // Keep race content (progress bars) visible; just hide the leave button and show finished notice
+    if (mpQuitRaceBtn)    mpQuitRaceBtn.style.display    = 'none';
+    if (mpProcessing)     mpProcessing.style.display     = 'none';
     if (mpFinishedNotice) mpFinishedNotice.style.display = '';
 
     try {
@@ -743,6 +828,7 @@ async function _initMultiplayer() {
     if (mpRaceContent)    mpRaceContent.style.display    = '';
     if (mpProcessing)     mpProcessing.style.display     = 'none';
     if (mpFinishedNotice) mpFinishedNotice.style.display = 'none';
+    if (mpQuitRaceBtn)    mpQuitRaceBtn.style.display    = '';
 
     // Write this player's "wants rematch" intent to RTDB so others can see it
     const _wantUser = getCurrentUser();
@@ -795,7 +881,18 @@ async function _initMultiplayer() {
       mpStartNewRaceBtn.textContent = 'Starting…';
       try {
         const token = await getIdToken();
-        const customText = _useRematchCustom ? (mpRematchCustomInput?.value.trim() || '') : '';
+        let customText = _useRematchCustom ? (mpRematchCustomInput?.value.trim() || '') : '';
+        if (customText) customText = customText.charAt(0).toUpperCase() + customText.slice(1);
+        // Apply modifiers if set and no custom text
+        if (!customText && _rematchModifiers.size > 0) {
+          const sRes = await fetch(
+            `${API_BASE}/get-sentences?count=${_rematchLines}&category=${_rematchCategory}&lang=${_rematchLang}`
+          );
+          const sData = await sRes.json();
+          const joined = (sData.sentences || [sData.sentence])
+            .map(s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s).join('. ');
+          customText = _applyMpModifiers(joined, _rematchModifiers);
+        }
         await fetch(
           `${API_BASE}/reset-room/${roomCode}?count=${_rematchLines}&category=${_rematchCategory}&lang=${_rematchLang}`,
           {
@@ -805,11 +902,13 @@ async function _initMultiplayer() {
           },
         );
       } catch (_) {}
-      // Reset rematch custom state
+      // Reset rematch custom + modifier state
       _useRematchCustom = false;
       if (mpRematchCustomToggle) mpRematchCustomToggle.classList.remove('active');
       if (mpRematchCustomInput)  { mpRematchCustomInput.style.display = 'none'; mpRematchCustomInput.value = ''; }
       if (mpRematchSelectors)    mpRematchSelectors.style.display = '';
+      _rematchModifiers.clear();
+      document.querySelectorAll('#mp-rematch-modifier-pills .mp-line-pill').forEach(p => p.classList.remove('active'));
       _resetResultPanel();
       mpResultPanel.classList.remove('show');
       _showView('room');
@@ -884,13 +983,15 @@ async function _initMultiplayer() {
     }
     racePanel.style.display = 'none';
     mpResultPanel.classList.remove('show');
-    // Restore solo controls
-    const langBar  = document.querySelector('.lang-toggle-bar');
-    const lineSel  = document.querySelector('.line-selector');
-    const controls = document.querySelector('.controls');
-    if (langBar)  langBar.style.display  = '';
-    if (lineSel)  lineSel.style.display  = '';
-    if (controls) controls.style.display = '';
+    // Restore solo controls + top progress bar
+    const langBar    = document.querySelector('.lang-toggle-bar');
+    const lineSel    = document.querySelector('.line-selector');
+    const controls   = document.querySelector('.controls');
+    const progressCt = document.querySelector('.progress-container');
+    if (langBar)    langBar.style.display    = '';
+    if (lineSel)    lineSel.style.display    = '';
+    if (controls)   controls.style.display   = '';
+    if (progressCt) progressCt.style.display = '';
     _showView('lobby');
   }
 
@@ -1021,6 +1122,21 @@ async function _initMultiplayer() {
       } // end else (not signed in)
     }); // end waitForAuthReady.then
   } // end if (urlRoom)
+
+  // ── Keyboard shortcuts for MP result panel ───────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if (!mpResultPanel || !mpResultPanel.classList.contains('show')) return;
+    // Enter to play again (only when the default action row is visible)
+    if (e.key === 'Enter' && mpResultActions && mpResultActions.style.display !== 'none') {
+      e.preventDefault();
+      mpPlayAgainBtn?.click();
+    }
+    // Escape to leave room from results
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      (mpResultLeaveBtn || mpResultLeaveBtn2)?.click();
+    }
+  });
 }
 
 function _esc(s) {
