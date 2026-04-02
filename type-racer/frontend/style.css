@@ -1542,6 +1542,20 @@ body.typing-active .btn-give-up { display: inline-block; }
   color:        #111; /* overridden by inline style for colored avatars */
 }
 .mp-bar-name { width: 90px; max-width: 90px; flex-shrink: 0; color: var(--text); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mp-you-badge {
+  display:       inline-block;
+  font-size:     0.6rem;
+  font-weight:   700;
+  padding:       1px 5px;
+  border-radius: 99px;
+  background:    var(--accent);
+  color:         #111;
+  vertical-align: middle;
+  margin-left:   3px;
+  flex-shrink:   0;
+}
+.mp-bar-row--me .mp-bar-track .mp-bar-fill { box-shadow: 0 0 6px 1px var(--accent); }
+.mp-result-row--me { background: color-mix(in srgb, var(--accent) 10%, var(--surface2)); }
 .mp-bar-track {
   flex:          1;
   height:        8px;

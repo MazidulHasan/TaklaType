@@ -707,7 +707,7 @@ async function finishRound() {
   progressBar.style.width = '100%';
 
   // Notify multiplayer module that race is done
-  window.dispatchEvent(new CustomEvent('tt-finished', { detail: { wpm, accuracy: acc, errors: totalErrors, time: elapsedSeconds } }));
+  window.dispatchEvent(new CustomEvent('tt-finished', { detail: { wpm, accuracy: acc, errors: totalErrors, time: elapsedSeconds, keyErrors: { ...keyErrors } } }));
 
   // In multiplayer the MP results overlay handles everything — skip solo UI
   if (window.__tt?.inMultiplayer) return;

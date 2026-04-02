@@ -471,6 +471,8 @@ async function _initMultiplayer() {
     if (mpResetWaiting)  mpResetWaiting.style.display  = 'none';
     if (mpPlayAgainBtn)  { mpPlayAgainBtn.disabled = false; mpPlayAgainBtn.textContent = '↺ Play Again'; }
     if (mpStartNewRaceBtn) { mpStartNewRaceBtn.disabled = false; mpStartNewRaceBtn.textContent = '▶ Start New Race'; }
+    const mpHeatmapSection = document.getElementById('mp-heatmap-section');
+    if (mpHeatmapSection) mpHeatmapSection.style.display = 'none';
     _renderWantsRematch({});
   }
 
@@ -733,16 +735,17 @@ async function _initMultiplayer() {
   function _renderPlayerBars(players) {
     const user = getCurrentUser();
     playerBars.innerHTML = Object.entries(players).map(([uid, p]) => {
-      const you    = uid === user?.uid ? ' (you)' : '';
+      const isMe   = uid === user?.uid;
+      const youBadge = isMe ? ' <span class="mp-you-badge">me</span>' : '';
       const pct    = p.finished ? 100 : Math.min(p.progress || 0, 100);
       const finTag = p.finished ? ` <span class="mp-bar-rank">#${p.rank}</span>` : '';
       const color  = _uidToColor(uid);
       const avatar = p.photoURL
         ? `<img class="mp-bar-avatar" src="${_esc(p.photoURL)}" alt="" onerror="this.style.display='none'">`
         : `<span class="mp-bar-avatar-fb" style="background:${color}">${_esc((p.displayName || '?')[0].toUpperCase())}</span>`;
-      return `<div class="mp-bar-row">
+      return `<div class="mp-bar-row${isMe ? ' mp-bar-row--me' : ''}">
         ${avatar}
-        <span class="mp-bar-name">${_esc(p.displayName)}${you}</span>
+        <span class="mp-bar-name">${_esc(p.displayName)}${youBadge}</span>
         <div class="mp-bar-track">
           <div class="mp-bar-fill" style="width:${pct}%;background:${color}"></div>
         </div>
@@ -767,9 +770,11 @@ async function _initMultiplayer() {
   });
 
   // ── Handle own race finish ───────────────────────────────────────────────────
+  let _myKeyErrors = {};
   window.addEventListener('tt-finished', async ({ detail }) => {
     if (!roomCode || !_raceStarted || _selfFinished) return;
     _selfFinished = true;
+    _myKeyErrors = detail.keyErrors || {};
 
     // Keep race content (progress bars) visible; just hide the leave button and show finished notice
     if (mpQuitRaceBtn)    mpQuitRaceBtn.style.display    = 'none';
@@ -795,16 +800,20 @@ async function _initMultiplayer() {
     const unfinished = Object.values(players).filter(p => !p.finished);
     const sortedUids = [...Object.entries(players).filter(([,p]) => p.finished).sort((a,b) => a[1].rank - b[1].rank),
                          ...Object.entries(players).filter(([,p]) => !p.finished)];
+    const currentUser = getCurrentUser();
     mpResultList.innerHTML = sortedUids.map(([uid, p]) => {
-      const pos  = p.finished ? `#${p.rank}` : 'DNF';
-      const dot  = `<span class="mp-result-dot" style="background:${_uidToColor(uid)}"></span>`;
-      return `<li class="mp-result-row" data-uid="${_esc(uid)}">
+      const isMe    = uid === currentUser?.uid;
+      const pos     = p.finished ? `#${p.rank}` : 'DNF';
+      const dot     = `<span class="mp-result-dot" style="background:${_uidToColor(uid)}"></span>`;
+      const youBadge = isMe ? ' <span class="mp-you-badge">me</span>' : '';
+      return `<li class="mp-result-row${isMe ? ' mp-result-row--me' : ''}" data-uid="${_esc(uid)}">
         <span class="mp-result-pos">${pos}</span>
-        ${dot}<span class="mp-result-name">${_esc(p.displayName)}</span>
+        ${dot}<span class="mp-result-name">${_esc(p.displayName)}${youBadge}</span>
         <span class="mp-result-wpm">${p.wpm || 0} WPM</span>
         <span class="mp-result-rematch-icon" style="visibility:hidden" title="Wants to play again">↺</span>
       </li>`;
     }).join('');
+    _renderMpHeatmap(_myKeyErrors);
     // Label the result-actions leave button based on role
     if (mpResultLeaveBtn) {
       mpResultLeaveBtn.textContent = isHost ? 'Close Room' : 'Leave Room';
@@ -818,11 +827,38 @@ async function _initMultiplayer() {
     mpResultPanel.classList.add('show');
   }
 
+  // ── Render key-error heatmap in MP result modal ──────────────────────────────
+  const MP_KEYBOARD_ROWS = [
+    ['q','w','e','r','t','y','u','i','o','p'],
+    ['a','s','d','f','g','h','j','k','l'],
+    ['z','x','c','v','b','n','m',' '],
+  ];
+  function _renderMpHeatmap(keyErrors) {
+    const section  = document.getElementById('mp-heatmap-section');
+    const keyboard = document.getElementById('mp-heatmap-keyboard');
+    if (!section || !keyboard) return;
+    if (!keyErrors || Object.keys(keyErrors).length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+    const maxErr = Math.max(...Object.values(keyErrors));
+    keyboard.innerHTML = MP_KEYBOARD_ROWS.map(row =>
+      `<div class="hk-row">${row.map(key => {
+        const errs  = keyErrors[key] || 0;
+        const heat  = errs > 0 ? Math.ceil((errs / maxErr) * 4) : 0;
+        const label = key === ' ' ? '␣' : key.toUpperCase();
+        return `<span class="hk-key heat-${heat}" title="${errs} mistake${errs !== 1 ? 's' : ''}">${label}</span>`;
+      }).join('')}</div>`
+    ).join('');
+    section.style.display = '';
+  }
+
   // ── Play again — host sees rematch setup; non-host waits ────────────────────
   mpPlayAgainBtn.addEventListener('click', async () => {
     _raceStarted  = false;
     _selfFinished = false;
     _isReady      = false;
+    _myKeyErrors  = {};
     if (window.__tt) window.__tt.setMultiplayer(false);
     racePanel.style.display = 'none';
     if (mpRaceContent)    mpRaceContent.style.display    = '';
